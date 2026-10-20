@@ -14,6 +14,12 @@ from flask import (
     session,
     flash
 )
+from favorites import (
+    save_favorite,
+    get_favorites,
+    add_favorite_to_daily_tracker,
+    delete_favorite
+)
 
 from flask import jsonify
 from auth import auth
@@ -347,6 +353,74 @@ def food_history():
         goals=goals,
         selected_date=selected_date
     )
+
+
+@app.route("/favorites")
+def favorites_page():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    favorites = get_favorites(session["user_id"])
+
+    return render_template(
+        "favorites.html",
+        favorites=favorites
+    )
+
+
+@app.route("/favorites/save/<int:entry_id>", methods=["POST"])
+def save_favorite_entry(entry_id):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    saved = save_favorite(session["user_id"], entry_id)
+
+    if saved:
+        flash("Food saved to favorites.")
+    else:
+        flash("Food entry not found.")
+
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/favorites/add/<int:favorite_id>", methods=["POST"])
+def add_favorite_entry(favorite_id):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    try:
+        amount = float(request.form["amount"])
+
+        if not math.isfinite(amount) or not 0 < amount <= 10000:
+            raise ValueError
+
+    except (ValueError, KeyError):
+        flash("Please enter a valid amount.")
+        return redirect(url_for("favorites_page"))
+
+    added = add_favorite_to_daily_tracker(
+        session["user_id"],
+        favorite_id,
+        amount
+    )
+
+    if added:
+        flash("Favorite added to today's food.")
+        return redirect(url_for("dashboard"))
+
+    flash("Favorite not found.")
+    return redirect(url_for("favorites_page"))
+
+
+@app.route("/favorites/delete/<int:favorite_id>", methods=["POST"])
+def delete_favorite_entry(favorite_id):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    delete_favorite(session["user_id"], favorite_id)
+
+    flash("Favorite removed.")
+    return redirect(url_for("favorites_page"))
 
 
 if __name__ == "__main__":

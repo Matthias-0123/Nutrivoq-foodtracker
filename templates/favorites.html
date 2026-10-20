@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favorites - Jumbo Food Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container dashboard-container">
+    <h1>My Favorites</h1>
+    <p>Quickly add your favorite foods to today's tracker.</p>
+
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
+
+    {% for favorite in favorites %}
+        <section class="nutrition-card">
+            <h2>{{ favorite.food_name }}</h2>
+
+            <p class="muted">
+                Saved amount: {{ favorite.amount }} g
+            </p>
+
+            <div class="macro">
+                <span>Calories</span>
+                <strong>{{ favorite.calories }} kcal</strong>
+            </div>
+
+            <div class="macro">
+                <span>Protein</span>
+                <strong>{{ favorite.protein }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Carbs</span>
+                <strong>{{ favorite.carbs }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Fat</span>
+                <strong>{{ favorite.fat }} g</strong>
+            </div>
+
+            <form
+                method="POST"
+                action="{{ url_for('add_favorite_entry', favorite_id=favorite.id) }}"
+            >
+                <label for="amount-{{ favorite.id }}">Amount (g)</label>
+
+                <input
+                    type="number"
+                    id="amount-{{ favorite.id }}"
+                    name="amount"
+                    value="{{ favorite.amount }}"
+                    min="0.1"
+                    max="10000"
+                    step="0.1"
+                    required
+                >
+
+                <button type="submit">Add to Today</button>
+            </form>
+
+            <form
+                method="POST"
+                action="{{ url_for('delete_favorite_entry', favorite_id=favorite.id) }}"
+            >
+                <button type="submit" class="delete-button">
+                    Remove Favorite
+                </button>
+            </form>
+        </section>
+    {% else %}
+        <section class="nutrition-card">
+            <p>No favorites saved yet.</p>
+            <p>Save foods from your dashboard to see them here.</p>
+        </section>
+    {% endfor %}
+
+    <a href="{{ url_for('dashboard') }}">
+        Back to Dashboard
+    </a>
+</main>
+</body>
+</html>

@@ -336,3 +336,21 @@ a:hover {
     border-radius: 14px;
     margin: 20px 0;
 }
+
+
+.favorite-button {
+    background: #eab308;
+    color: #1f2937;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.favorite-button:hover {
+    background: #facc15;
+}
+
+.nutrition-card form {
+    margin-top: 15px;
+}

@@ -17,7 +17,9 @@
         </div>
 
         <form action="{{ url_for('auth.logout') }}" method="POST">
-            <button type="submit" class="secondary-button">Log Out</button>
+            <button type="submit" class="secondary-button">
+                Log Out
+            </button>
         </form>
     </header>
 
@@ -54,8 +56,8 @@
             </div>
 
             <p class="muted">
-                {{ calorie_percentage | round | int }}% of
-                {{ goals.calories }} kcal goal
+                {{ calorie_percentage | round | int }}%
+                of {{ goals.calories }} kcal goal
             </p>
         </section>
 
@@ -65,12 +67,24 @@
             <div class="macro-grid">
 
                 {% for macro in [
-                    {"name": "Protein", "used": totals.protein,
-                     "goal": goals.protein, "color": "#38bdf8"},
-                    {"name": "Carbs", "used": totals.carbs,
-                     "goal": goals.carbs, "color": "#f59e0b"},
-                    {"name": "Fat", "used": totals.fat,
-                     "goal": goals.fat, "color": "#a78bfa"}
+                    {
+                        "name": "Protein",
+                        "used": totals.protein,
+                        "goal": goals.protein,
+                        "color": "#38bdf8"
+                    },
+                    {
+                        "name": "Carbs",
+                        "used": totals.carbs,
+                        "goal": goals.carbs,
+                        "color": "#f59e0b"
+                    },
+                    {
+                        "name": "Fat",
+                        "used": totals.fat,
+                        "goal": goals.fat,
+                        "color": "#a78bfa"
+                    }
                 ] %}
 
                     {% set percentage =
@@ -78,13 +92,16 @@
                         if macro.goal > 0 else 0 %}
 
                     {% set circle_percentage =
-                        [percentage, 100] | min %}
+                        [[percentage, 0] | max, 100] | min %}
 
                     <div class="macro-item">
-                        <div class="progress-circle"
-                             style="--progress: {{ circle_percentage }}%;
-                                    --circle-color: {{ macro.color }};">
-
+                        <div
+                            class="progress-circle"
+                            style="
+                                --progress: {{ circle_percentage }}%;
+                                --circle-color: {{ macro.color }};
+                            "
+                        >
                             <div class="circle-inner">
                                 <strong>
                                     {{ percentage | round | int }}%
@@ -107,19 +124,22 @@
     {% else %}
 
         <section class="nutrition-card">
-            <h2>Set Your Goals</h2>
-            <p>Calculate your daily calorie and macro targets.</p>
-            <a href="{{ url_for('setup') }}">Set Nutrition Goals</a>
+            <h2>Set Your Nutrition Goals</h2>
+            <p>
+                Calculate your daily calorie and macronutrient targets.
+            </p>
+
+            <a class="action-link" href="{{ url_for('setup') }}">
+                Set Nutrition Goals
+            </a>
         </section>
 
     {% endif %}
 
     <div class="dashboard-actions">
 
-        <a class="action-link secondary-link" href="{{ url_for('food_history') }}">
-            Food History
-        </a>
-        <a class="action-link" href="{{ url_for('search_food') }}">
+        <a class="action-link"
+           href="{{ url_for('search_food') }}">
             Search Jumbo Products
         </a>
 
@@ -129,19 +149,37 @@
         </a>
 
         <a class="action-link secondary-link"
+           href="{{ url_for('favorites_page') }}">
+            My Favorites
+        </a>
+
+        <a class="action-link secondary-link"
+           href="{{ url_for('food_history') }}">
+            Food History
+        </a>
+
+        <a class="action-link secondary-link"
            href="{{ url_for('setup') }}">
             Update Goals
         </a>
+
     </div>
 
     <section class="nutrition-card">
         <h2>Today's Food</h2>
 
         {% for entry in entries %}
+
             <div class="food-entry">
-                <div>
+
+                <div class="food-entry-details">
                     <strong>{{ entry.food_name }}</strong>
-                    <p>{{ entry.amount }} g — {{ entry.calories }} kcal</p>
+
+                    <p>
+                        {{ entry.amount }} g —
+                        {{ entry.calories }} kcal
+                    </p>
+
                     <small>
                         Protein: {{ entry.protein }} g |
                         Carbs: {{ entry.carbs }} g |
@@ -149,16 +187,38 @@
                     </small>
                 </div>
 
-                <form method="POST"
-                      action="{{ url_for('delete_food_entry', entry_id=entry.id) }}">
-                    <button type="submit" class="delete-button">
-                        Delete
-                    </button>
-                </form>
+                <div class="food-entry-actions">
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}"
+                    >
+                        <button type="submit" class="favorite-button">
+                            ★ Save Favorite
+                        </button>
+                    </form>
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('delete_food_entry', entry_id=entry.id) }}"
+                    >
+                        <button type="submit" class="delete-button">
+                            Delete
+                        </button>
+                    </form>
+
+                </div>
+
             </div>
+
         {% else %}
-            <p class="muted">No food logged today.</p>
+
+            <p class="muted">
+                No food logged today.
+            </p>
+
         {% endfor %}
+
     </section>
 
 </main>
