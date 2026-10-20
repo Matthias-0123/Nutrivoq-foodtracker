@@ -354,3 +354,43 @@ a:hover {
 .nutrition-card form {
     margin-top: 15px;
 }
+
+
+.scanner-container {
+    max-width: 700px;
+    margin: 40px auto;
+}
+
+#reader {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 14px;
+}
+
+#reader video {
+    border-radius: 14px;
+}
+
+.scanner-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.scanner-actions button {
+    flex: 1;
+    min-width: 140px;
+}
+
+.scanner-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#scanner-status {
+    text-align: center;
+    margin-top: 15px;
+}

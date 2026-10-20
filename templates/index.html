@@ -10,32 +10,55 @@
 <body>
     <main class="container">
         {% for message in get_flashed_messages() %}
-    <p class="message">{{ message }}</p>
-{% endfor %}
+            <p class="message">{{ message }}</p>
+        {% endfor %}
+
         <h1>Food Tracker</h1>
         <p>Calculate your daily calorie and macro goals.</p>
 
         <form method="POST" action="{{ url_for('setup') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
             <label for="weight">Weight (kg)</label>
-            <input type="number" id="weight" name="weight"
-                   min="1" step="0.1" required>
+            <input
+                type="number"
+                id="weight"
+                name="weight"
+                min="0.1"
+                max="500"
+                step="0.1"
+                required
+            >
 
             <label for="height">Height (cm)</label>
-            <input type="number" id="height" name="height"
-                   min="1" step="0.1" required>
+            <input
+                type="number"
+                id="height"
+                name="height"
+                min="1"
+                max="300"
+                step="0.1"
+                required
+            >
 
             <label for="age">Age</label>
-            <input type="number" id="age" name="age"
-                   min="1" required>
+            <input
+                type="number"
+                id="age"
+                name="age"
+                min="1"
+                max="120"
+                required
+            >
 
             <label for="sex">Sex (for BMR calculation)</label>
-            <select id="sex" name="sex">
+            <select id="sex" name="sex" required>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
             </select>
 
             <label for="activity_level">Activity Level</label>
-            <select id="activity_level" name="activity_level">
+            <select id="activity_level" name="activity_level" required>
                 <option value="1.2">Sedentary</option>
                 <option value="1.375">Lightly Active</option>
                 <option value="1.55">Moderately Active</option>
@@ -46,30 +69,36 @@
         </form>
 
         {% if goals %}
-        <section class="results">
-            <h2>Your Daily Goals</h2>
+            <section class="results">
+                <h2>Your Daily Goals</h2>
 
-            <div class="macro">
-                <span>Calories</span>
-                <strong>{{ goals.calories }} kcal</strong>
-            </div>
+                <div class="macro">
+                    <span>Calories</span>
+                    <strong>{{ goals.calories }} kcal</strong>
+                </div>
 
-            <div class="macro">
-                <span>Protein</span>
-                <strong>{{ goals.protein }} g</strong>
-            </div>
+                <div class="macro">
+                    <span>Protein</span>
+                    <strong>{{ goals.protein }} g</strong>
+                </div>
 
-            <div class="macro">
-                <span>Carbohydrates</span>
-                <strong>{{ goals.carbs }} g</strong>
-            </div>
+                <div class="macro">
+                    <span>Carbohydrates</span>
+                    <strong>{{ goals.carbs }} g</strong>
+                </div>
 
-            <div class="macro">
-                <span>Fat</span>
-                <strong>{{ goals.fat }} g</strong>
-            </div>
-        </section>
+                <div class="macro">
+                    <span>Fat</span>
+                    <strong>{{ goals.fat }} g</strong>
+                </div>
+            </section>
         {% endif %}
+
+        <p>
+            <a href="{{ url_for('dashboard') }}">
+                Back to Dashboard
+            </a>
+        </p>
     </main>
 </body>
 </html>

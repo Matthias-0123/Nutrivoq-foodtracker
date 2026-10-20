@@ -1,10 +1,12 @@
 
-import os
 import math
+import os
+import re
 import requests
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
+
 from flask import (
     Flask,
     render_template,
@@ -12,17 +14,13 @@ from flask import (
     redirect,
     url_for,
     session,
-    flash
+    flash,
+    jsonify
 )
-from favorites import (
-    save_favorite,
-    get_favorites,
-    add_favorite_to_daily_tracker,
-    delete_favorite
-)
+from flask_wtf.csrf import CSRFProtect
 
-from flask import jsonify
 from auth import auth
+from extensions import limiter
 from database import get_database, initialize_database
 from nutrition import calculate_calorie_goal, calculate_macros
 from food import (
@@ -31,17 +29,68 @@ from food import (
     calculate_daily_totals,
     delete_food
 )
+from favorites import (
+    save_favorite,
+    get_favorites,
+    add_favorite_to_daily_tracker,
+    delete_favorite
+)
 from product_api import search_products, get_product
 
 
 load_dotenv()
 
 app = Flask(__name__)
+
 app.secret_key = os.environ["SECRET_KEY"]
+
+is_production = os.getenv("FLASK_ENV") == "production"
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=is_production,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+    MAX_CONTENT_LENGTH=1024 * 1024,
+    WTF_CSRF_TIME_LIMIT=3600
+)
+
+csrf = CSRFProtect(app)
+limiter.init_app(app)
 
 app.register_blueprint(auth)
 
 initialize_database()
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "camera=(self), microphone=(), geolocation=()"
+    )
+
+    if is_production:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000"
+        )
+
+    if "user_id" in session:
+        response.headers["Cache-Control"] = "no-store"
+
+    return response
+
+
+@app.errorhandler(413)
+def request_too_large(error):
+    return "Request too large.", 413
+
+
+@app.errorhandler(429)
+def too_many_requests(error):
+    return "Too many requests. Please try again later.", 429
 
 
 @app.route("/")
@@ -89,6 +138,7 @@ def dashboard():
 
 
 @app.route("/api/products/search")
+@limiter.limit("30 per minute")
 def search_products_api():
     if "user_id" not in session:
         return jsonify({"error": "Unauthorized"}), 401
@@ -122,24 +172,27 @@ def setup():
             sex = request.form["sex"]
             activity_level = float(request.form["activity_level"])
 
-            if not all(math.isfinite(value) for value in (
-                weight, height, activity_level
-            )):
+            if not all(
+                math.isfinite(value)
+                for value in (weight, height, activity_level)
+            ):
                 raise ValueError
 
-            if not (0 < weight <= 500):
+            if not 0 < weight <= 500:
                 raise ValueError
 
-            if not (0 < height <= 300):
+            if not 0 < height <= 300:
                 raise ValueError
 
-            if not (0 < age <= 120):
+            if not 0 < age <= 120:
                 raise ValueError
 
             if sex not in ("male", "female"):
                 raise ValueError
 
-            if activity_level not in (1.2, 1.375, 1.55, 1.725):
+            if activity_level not in (
+                1.2, 1.375, 1.55, 1.725
+            ):
                 raise ValueError
 
         except (ValueError, KeyError):
@@ -157,13 +210,10 @@ def setup():
         goals = calculate_macros(calorie_goal, weight)
 
         with get_database() as connection:
-            connection.execute("""
+            connection.execute(
+                """
                 INSERT INTO user_goals (
-                    user_id,
-                    calories,
-                    protein,
-                    carbs,
-                    fat
+                    user_id, calories, protein, carbs, fat
                 )
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
@@ -171,13 +221,15 @@ def setup():
                     protein = excluded.protein,
                     carbs = excluded.carbs,
                     fat = excluded.fat
-            """, (
-                session["user_id"],
-                goals["calories"],
-                goals["protein"],
-                goals["carbs"],
-                goals["fat"]
-            ))
+                """,
+                (
+                    session["user_id"],
+                    goals["calories"],
+                    goals["protein"],
+                    goals["carbs"],
+                    goals["fat"]
+                )
+            )
 
         return redirect(url_for("dashboard"))
 
@@ -204,7 +256,9 @@ def add_food_page():
             if not math.isfinite(amount) or not 0 < amount <= 10000:
                 raise ValueError
 
-            nutrition_values = (calories, protein, carbs, fat)
+            nutrition_values = (
+                calories, protein, carbs, fat
+            )
 
             if not all(
                 math.isfinite(value) and 0 <= value <= 100000
@@ -256,7 +310,11 @@ def search_food():
         else:
             try:
                 products = search_products(query)
-            except (requests.RequestException, ValueError):
+            except (
+                requests.RequestException,
+                ValueError,
+                TypeError
+            ):
                 error = "Product search is temporarily unavailable."
 
     return render_template(
@@ -268,13 +326,21 @@ def search_food():
 
 
 @app.route("/food/select/<barcode>", methods=["GET", "POST"])
+@limiter.limit("60 per minute")
 def select_food(barcode):
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
+    if not re.fullmatch(r"[0-9]{8,14}", barcode):
+        return "Invalid barcode.", 400
+
     try:
         product = get_product(barcode)
-    except (requests.RequestException, ValueError, TypeError):
+    except (
+        requests.RequestException,
+        ValueError,
+        TypeError
+    ):
         return "Unable to load product.", 502
 
     if product is None:
@@ -298,6 +364,17 @@ def select_food(barcode):
         carbs = round(product["carbs"] * multiplier, 1)
         fat = round(product["fat"] * multiplier, 1)
 
+        nutrition_values = (
+            calories, protein, carbs, fat
+        )
+
+        if not all(
+            math.isfinite(value) and 0 <= value <= 100000
+            for value in nutrition_values
+        ):
+            flash("Invalid nutritional information.")
+            return redirect(url_for("select_food", barcode=barcode))
+
         add_food(
             session["user_id"],
             product["name"],
@@ -309,7 +386,6 @@ def select_food(barcode):
         )
 
         flash("Food added successfully.")
-
         return redirect(url_for("dashboard"))
 
     return render_template(
@@ -423,5 +499,13 @@ def delete_favorite_entry(favorite_id):
     return redirect(url_for("favorites_page"))
 
 
+@app.route("/food/scan")
+def scan_food():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    return render_template("scan_food.html")
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=not is_production)

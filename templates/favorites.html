@@ -9,6 +9,7 @@
 </head>
 <body>
 <main class="container dashboard-container">
+
     <h1>My Favorites</h1>
     <p>Quickly add your favorite foods to today's tracker.</p>
 
@@ -17,6 +18,7 @@
     {% endfor %}
 
     {% for favorite in favorites %}
+
         <section class="nutrition-card">
             <h2>{{ favorite.food_name }}</h2>
 
@@ -48,7 +50,15 @@
                 method="POST"
                 action="{{ url_for('add_favorite_entry', favorite_id=favorite.id) }}"
             >
-                <label for="amount-{{ favorite.id }}">Amount (g)</label>
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token() }}"
+                >
+
+                <label for="amount-{{ favorite.id }}">
+                    Amount (g)
+                </label>
 
                 <input
                     type="number"
@@ -61,28 +71,40 @@
                     required
                 >
 
-                <button type="submit">Add to Today</button>
+                <button type="submit">
+                    Add to Today
+                </button>
             </form>
 
             <form
                 method="POST"
                 action="{{ url_for('delete_favorite_entry', favorite_id=favorite.id) }}"
             >
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token() }}"
+                >
+
                 <button type="submit" class="delete-button">
                     Remove Favorite
                 </button>
             </form>
         </section>
+
     {% else %}
+
         <section class="nutrition-card">
             <p>No favorites saved yet.</p>
             <p>Save foods from your dashboard to see them here.</p>
         </section>
+
     {% endfor %}
 
     <a href="{{ url_for('dashboard') }}">
         Back to Dashboard
     </a>
+
 </main>
 </body>
 </html>

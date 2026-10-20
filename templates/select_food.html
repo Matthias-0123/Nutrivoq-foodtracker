@@ -24,6 +24,8 @@
     {% endfor %}
 
     <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <label for="amount">Amount (g)</label>
         <input
             type="number"
