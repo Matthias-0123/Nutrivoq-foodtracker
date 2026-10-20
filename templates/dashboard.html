@@ -1,10 +1,51 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Food Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-$END$
+    <main class="container">
+        <h1>My Dashboard</h1>
+        <p>Logged in as {{ session.email }}</p>
+
+        {% if goals %}
+            <section class="results">
+                <h2>Daily Nutrition Goals</h2>
+
+                <div class="macro">
+                    <span>Calories</span>
+                    <strong>{{ goals.calories }} kcal</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Protein</span>
+                    <strong>{{ goals.protein }} g</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Carbohydrates</span>
+                    <strong>{{ goals.carbs }} g</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Fat</span>
+                    <strong>{{ goals.fat }} g</strong>
+                </div>
+            </section>
+
+            <p><a href="{{ url_for('setup') }}">Update My Goals</a></p>
+        {% else %}
+            <p>You haven't set your nutrition goals yet.</p>
+            <a href="{{ url_for('setup') }}">Set Up My Goals</a>
+        {% endif %}
+
+        <form action="{{ url_for('auth.logout') }}" method="POST">
+            <button type="submit">Log Out</button>
+        </form>
+    </main>
 </body>
 </html>
