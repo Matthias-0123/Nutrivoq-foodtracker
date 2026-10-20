@@ -21,7 +21,7 @@ def search_products(search_query):
         "tagtype_0": "brands",
         "tag_contains_0": "contains",
         "tag_0": "jumbo",
-        "fields": "code,product_name,brands,nutriments"
+        "fields": "code,product_name,brands,nutriments,image_front_small_url"
     }
 
     response = requests.get(
@@ -49,22 +49,29 @@ def search_products(search_query):
             "fat_100g"
         )
 
-        if not name or not all(field in nutrition for field in required_fields):
+        if not name or not all(
+            field in nutrition for field in required_fields
+        ):
+            continue
+
+        barcode = product.get("code", "")
+
+        if not barcode.isdigit():
             continue
 
         products.append({
-            "barcode": product.get("code", ""),
+            "barcode": barcode,
             "name": name,
             "brand": brand,
+            "image": product.get("image_front_small_url", ""),
             "calories": nutrition["energy-kcal_100g"],
             "protein": nutrition["proteins_100g"],
             "carbs": nutrition["carbohydrates_100g"],
             "fat": nutrition["fat_100g"]
         })
 
-
-
     return products
+
 
 def get_product(barcode):
     if not barcode.isdigit() or len(barcode) > 14:
@@ -73,7 +80,7 @@ def get_product(barcode):
     response = requests.get(
         f"https://world.openfoodfacts.org/api/v2/product/{barcode}",
         params={
-            "fields": "code,product_name,brands,nutriments"
+            "fields": "code,product_name,brands,nutriments,image_front_small_url"
         },
         headers=HEADERS,
         timeout=10
@@ -91,21 +98,23 @@ def get_product(barcode):
     if "jumbo" not in product.get("brands", "").lower():
         return None
 
-    fields = (
+    required_fields = (
         "energy-kcal_100g",
         "proteins_100g",
         "carbohydrates_100g",
         "fat_100g"
     )
 
-    if not all(field in nutrition for field in fields):
+    if not all(
+        field in nutrition for field in required_fields
+    ):
         return None
 
     return {
         "name": product.get("product_name", "Unknown Product"),
+        "image": product.get("image_front_small_url", ""),
         "calories": float(nutrition["energy-kcal_100g"]),
         "protein": float(nutrition["proteins_100g"]),
         "carbs": float(nutrition["carbohydrates_100g"]),
         "fat": float(nutrition["fat_100g"])
     }
-

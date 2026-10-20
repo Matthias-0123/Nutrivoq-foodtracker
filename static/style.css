@@ -125,3 +125,214 @@ a:hover {
 .food-entry button:hover {
     background: #dc2626;
 }
+
+
+.dashboard-container {
+    max-width: 1000px;
+    margin: 40px auto;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.nutrition-card {
+    background: #1d3028;
+    border: 1px solid #30483c;
+    border-radius: 18px;
+    padding: 28px;
+    margin-bottom: 24px;
+}
+
+.nutrition-card h2 {
+    margin-top: 0;
+}
+
+.muted {
+    color: #9fb5a9;
+}
+
+.calorie-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 25px 0;
+}
+
+.calorie-summary h2 {
+    margin: 8px 0;
+}
+
+.progress-track {
+    width: 100%;
+    height: 16px;
+    background: #33473c;
+    border-radius: 100px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #4ade80;
+    border-radius: 100px;
+    transition: width 0.4s ease;
+}
+
+.macro-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 25px;
+}
+
+.macro-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.macro-item h3 {
+    margin: 15px 0 5px;
+}
+
+.progress-circle {
+    width: 145px;
+    height: 145px;
+    border-radius: 50%;
+    background: conic-gradient(
+        var(--circle-color) var(--progress),
+        #33473c var(--progress)
+    );
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.circle-inner {
+    width: 115px;
+    height: 115px;
+    background: #1d3028;
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.circle-inner strong {
+    font-size: 28px;
+    color: white;
+}
+
+.dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.action-link {
+    display: inline-block;
+    background: #22c55e;
+    color: #102017;
+    padding: 13px 18px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.secondary-link {
+    background: #33473c;
+    color: white;
+}
+
+.secondary-button {
+    background: #33473c;
+}
+
+.delete-button {
+    background: #dc2626;
+}
+
+@media (max-width: 600px) {
+    .macro-grid {
+        gap: 10px;
+    }
+
+    .progress-circle {
+        width: 90px;
+        height: 90px;
+    }
+
+    .circle-inner {
+        width: 70px;
+        height: 70px;
+    }
+
+    .circle-inner strong {
+        font-size: 18px;
+    }
+
+    .calorie-summary {
+        flex-direction: column;
+    }
+
+    .dashboard-header {
+        flex-wrap: wrap;
+    }
+}
+
+
+.product-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    margin: 15px 0;
+    background: #1d3028;
+    border: 1px solid #30483c;
+    border-radius: 14px;
+}
+
+.product-card img {
+    width: 90px;
+    height: 90px;
+    object-fit: contain;
+    background: white;
+    border-radius: 10px;
+}
+
+.product-details {
+    flex: 1;
+}
+
+.product-details h3 {
+    margin: 0 0 8px;
+}
+
+.product-details p {
+    color: #9fb5a9;
+}
+
+@media (max-width: 600px) {
+    .product-card {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+.selected-product-image {
+    display: block;
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    background: white;
+    border-radius: 14px;
+    margin: 20px 0;
+}

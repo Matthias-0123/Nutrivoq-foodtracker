@@ -4,41 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select Food - Jumbo Food Tracker</title>
+    <title>Add Food - Jumbo Food Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <main class="container">
     <h1>{{ product.name }}</h1>
-    <p>Enter the amount you consumed.</p>
+
+    {% if product.image %}
+        <img
+            src="{{ product.image }}"
+            alt="{{ product.name }}"
+            class="selected-product-image"
+        >
+    {% endif %}
 
     {% for message in get_flashed_messages() %}
         <p class="message">{{ message }}</p>
     {% endfor %}
-
-    <section class="results">
-        <h2>Nutrition per 100g</h2>
-
-        <div class="macro">
-            <span>Calories</span>
-            <strong>{{ product.calories }} kcal</strong>
-        </div>
-
-        <div class="macro">
-            <span>Protein</span>
-            <strong>{{ product.protein }} g</strong>
-        </div>
-
-        <div class="macro">
-            <span>Carbs</span>
-            <strong>{{ product.carbs }} g</strong>
-        </div>
-
-        <div class="macro">
-            <span>Fat</span>
-            <strong>{{ product.fat }} g</strong>
-        </div>
-    </section>
 
     <form method="POST">
         <label for="amount">Amount (g)</label>
@@ -53,10 +36,70 @@
             required
         >
 
+        <section class="nutrition-card">
+            <h2>Calculated Nutrition</h2>
+
+            <div class="macro">
+                <span>Calories</span>
+                <strong id="calories-value"></strong>
+            </div>
+
+            <div class="macro">
+                <span>Protein</span>
+                <strong id="protein-value"></strong>
+            </div>
+
+            <div class="macro">
+                <span>Carbs</span>
+                <strong id="carbs-value"></strong>
+            </div>
+
+            <div class="macro">
+                <span>Fat</span>
+                <strong id="fat-value"></strong>
+            </div>
+        </section>
+
         <button type="submit">Add to Daily Tracker</button>
     </form>
 
-    <p><a href="{{ url_for('search_food') }}">Back to Search</a></p>
+    <p>
+        <a href="{{ url_for('search_food') }}">
+            Back to Search
+        </a>
+    </p>
 </main>
+
+<script>
+    const nutritionPer100 = {
+        calories: {{ product.calories | tojson }},
+        protein: {{ product.protein | tojson }},
+        carbs: {{ product.carbs | tojson }},
+        fat: {{ product.fat | tojson }}
+    };
+
+    const amountInput = document.getElementById("amount");
+
+    function updateNutrition() {
+        const amount = Math.max(0, Number(amountInput.value) || 0);
+        const multiplier = amount / 100;
+
+        document.getElementById("calories-value").textContent =
+            (nutritionPer100.calories * multiplier).toFixed(1) + " kcal";
+
+        document.getElementById("protein-value").textContent =
+            (nutritionPer100.protein * multiplier).toFixed(1) + " g";
+
+        document.getElementById("carbs-value").textContent =
+            (nutritionPer100.carbs * multiplier).toFixed(1) + " g";
+
+        document.getElementById("fat-value").textContent =
+            (nutritionPer100.fat * multiplier).toFixed(1) + " g";
+    }
+
+    amountInput.addEventListener("input", updateNutrition);
+
+    updateNutrition();
+</script>
 </body>
 </html>

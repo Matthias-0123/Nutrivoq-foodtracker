@@ -15,6 +15,7 @@ from flask import (
     flash
 )
 
+from flask import jsonify
 from auth import auth
 from database import get_database, initialize_database
 from nutrition import calculate_calorie_goal, calculate_macros
@@ -79,6 +80,27 @@ def dashboard():
         totals=totals,
         remaining=remaining
     )
+
+
+@app.route("/api/products/search")
+def search_products_api():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    query = request.args.get("query", "").strip()
+
+    if len(query) < 3:
+        return jsonify([])
+
+    if len(query) > 100:
+        return jsonify({"error": "Search query too long"}), 400
+
+    try:
+        products = search_products(query)
+        return jsonify(products)
+
+    except (requests.RequestException, ValueError, TypeError):
+        return jsonify({"error": "Product search unavailable"}), 502
 
 
 @app.route("/setup", methods=["GET", "POST"])
