@@ -3,7 +3,7 @@ import os
 import math
 import requests
 
-from datetime import date
+from datetime import date, datetime
 from dotenv import load_dotenv
 from flask import (
     Flask,
@@ -309,6 +309,43 @@ def select_food(barcode):
     return render_template(
         "select_food.html",
         product=product
+    )
+
+
+@app.route("/history")
+def food_history():
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    selected_date = request.args.get(
+        "date",
+        date.today().isoformat()
+    )
+
+    try:
+        datetime.strptime(selected_date, "%Y-%m-%d")
+    except ValueError:
+        selected_date = date.today().isoformat()
+
+    entries = get_daily_food(
+        session["user_id"],
+        selected_date
+    )
+
+    totals = calculate_daily_totals(entries)
+
+    with get_database() as connection:
+        goals = connection.execute(
+            "SELECT * FROM user_goals WHERE user_id = ?",
+            (session["user_id"],)
+        ).fetchone()
+
+    return render_template(
+        "history.html",
+        entries=entries,
+        totals=totals,
+        goals=goals,
+        selected_date=selected_date
     )
 
 

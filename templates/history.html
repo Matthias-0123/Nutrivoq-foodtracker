@@ -1,0 +1,91 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food History - Jumbo Food Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container dashboard-container">
+
+    <h1>Food History</h1>
+    <p>View your nutrition from previous days.</p>
+
+    <form method="GET" action="{{ url_for('food_history') }}">
+        <label for="date">Select Date</label>
+
+        <input
+            type="date"
+            id="date"
+            name="date"
+            value="{{ selected_date }}"
+            required
+        >
+
+        <button type="submit">View History</button>
+    </form>
+
+    <section class="nutrition-card">
+        <h2>Daily Summary</h2>
+
+        <div class="macro">
+            <span>Calories</span>
+            <strong>{{ totals.calories }} kcal</strong>
+        </div>
+
+        <div class="macro">
+            <span>Protein</span>
+            <strong>{{ totals.protein }} g</strong>
+        </div>
+
+        <div class="macro">
+            <span>Carbs</span>
+            <strong>{{ totals.carbs }} g</strong>
+        </div>
+
+        <div class="macro">
+            <span>Fat</span>
+            <strong>{{ totals.fat }} g</strong>
+        </div>
+
+        {% if goals %}
+            <p class="muted">
+                Daily calorie goal: {{ goals.calories }} kcal
+            </p>
+        {% endif %}
+    </section>
+
+    <section class="nutrition-card">
+        <h2>Food Entries</h2>
+
+        {% for entry in entries %}
+            <div class="food-entry">
+                <div>
+                    <strong>{{ entry.food_name }}</strong>
+                    <p>
+                        {{ entry.amount }} g —
+                        {{ entry.calories }} kcal
+                    </p>
+                    <small>
+                        Protein: {{ entry.protein }} g |
+                        Carbs: {{ entry.carbs }} g |
+                        Fat: {{ entry.fat }} g
+                    </small>
+                </div>
+            </div>
+        {% else %}
+            <p class="muted">
+                No food entries found for this date.
+            </p>
+        {% endfor %}
+    </section>
+
+    <a href="{{ url_for('dashboard') }}">
+        Back to Dashboard
+    </a>
+
+</main>
+</body>
+</html>
