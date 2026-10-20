@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Food - Jumbo Food Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>Add Food</h1>
+        <p>Log your daily nutrition.</p>
+
+        {% for message in get_flashed_messages() %}
+            <p class="message">{{ message }}</p>
+        {% endfor %}
+
+        <form method="POST">
+            <label for="food_name">Food Name</label>
+            <input type="text" id="food_name" name="food_name" required>
+
+            <label for="amount">Amount (g)</label>
+            <input type="number" id="amount" name="amount"
+                   min="0.1" step="0.1" required>
+
+            <label for="calories">Calories (kcal)</label>
+            <input type="number" id="calories" name="calories"
+                   min="0" step="0.1" required>
+
+            <label for="protein">Protein (g)</label>
+            <input type="number" id="protein" name="protein"
+                   min="0" step="0.1" required>
+
+            <label for="carbs">Carbohydrates (g)</label>
+            <input type="number" id="carbs" name="carbs"
+                   min="0" step="0.1" required>
+
+            <label for="fat">Fat (g)</label>
+            <input type="number" id="fat" name="fat"
+                   min="0" step="0.1" required>
+
+            <button type="submit">Add Food</button>
+        </form>
+
+        <p><a href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+    </main>
+</body>
+</html>

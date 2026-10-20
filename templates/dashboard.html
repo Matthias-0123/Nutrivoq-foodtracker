@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Food Tracker</title>
+    <title>Dashboard - Jumbo Food Tracker</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -13,35 +13,66 @@
         <p>Logged in as {{ session.email }}</p>
 
         {% if goals %}
-            <section class="results">
-                <h2>Daily Nutrition Goals</h2>
+        <section class="results">
+            <h2>Daily Nutrition</h2>
 
-                <div class="macro">
-                    <span>Calories</span>
-                    <strong>{{ goals.calories }} kcal</strong>
-                </div>
+            <div class="macro">
+                <span>Calories Consumed</span>
+                <strong>{{ totals.calories }} kcal</strong>
+            </div>
 
-                <div class="macro">
-                    <span>Protein</span>
-                    <strong>{{ goals.protein }} g</strong>
-                </div>
+            <div class="macro">
+                <span>Calories Remaining</span>
+                <strong>{{ remaining.calories }} kcal</strong>
+            </div>
 
-                <div class="macro">
-                    <span>Carbohydrates</span>
-                    <strong>{{ goals.carbs }} g</strong>
-                </div>
+            <div class="macro">
+                <span>Protein</span>
+                <strong>{{ totals.protein }} / {{ goals.protein }} g</strong>
+            </div>
 
-                <div class="macro">
-                    <span>Fat</span>
-                    <strong>{{ goals.fat }} g</strong>
-                </div>
-            </section>
+            <div class="macro">
+                <span>Carbohydrates</span>
+                <strong>{{ totals.carbs }} / {{ goals.carbs }} g</strong>
+            </div>
 
-            <p><a href="{{ url_for('setup') }}">Update My Goals</a></p>
+            <div class="macro">
+                <span>Fat</span>
+                <strong>{{ totals.fat }} / {{ goals.fat }} g</strong>
+            </div>
+        </section>
         {% else %}
-            <p>You haven't set your nutrition goals yet.</p>
-            <a href="{{ url_for('setup') }}">Set Up My Goals</a>
+        <p>You haven't set your nutrition goals yet.</p>
         {% endif %}
+
+        <p><a href="{{ url_for('add_food_page') }}">+ Add Food</a></p>
+        <p><a href="{{ url_for('setup') }}">Update Goals</a></p>
+        <p><a href="{{ url_for('search_food') }}">Search Jumbo Products</a></p>
+
+        <section class="results">
+            <h2>Today's Food</h2>
+
+            {% for entry in entries %}
+            <div class="food-entry">
+                <div>
+                    <strong>{{ entry.food_name }}</strong>
+                    <p>{{ entry.amount }} g — {{ entry.calories }} kcal</p>
+                    <small>
+                        P: {{ entry.protein }} g |
+                        C: {{ entry.carbs }} g |
+                        F: {{ entry.fat }} g
+                    </small>
+                </div>
+
+                <form action="{{ url_for('delete_food_entry', entry_id=entry.id) }}"
+                      method="POST">
+                    <button type="submit">Delete</button>
+                </form>
+            </div>
+            {% else %}
+            <p>No food logged today.</p>
+            {% endfor %}
+        </section>
 
         <form action="{{ url_for('auth.logout') }}" method="POST">
             <button type="submit">Log Out</button>

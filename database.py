@@ -32,3 +32,20 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+
+
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS food_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                food_name TEXT NOT NULL,
+                amount REAL NOT NULL,
+                calories REAL NOT NULL,
+                protein REAL NOT NULL,
+                carbs REAL NOT NULL,
+                fat REAL NOT NULL,
+                entry_date TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
