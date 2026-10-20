@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>Food Tracker</h1>
+        <p>Calculate your daily calorie and macro goals.</p>
+
+        <form method="POST">
+            <label for="weight">Weight (kg)</label>
+            <input type="number" id="weight" name="weight"
+                   min="1" step="0.1" required>
+
+            <label for="height">Height (cm)</label>
+            <input type="number" id="height" name="height"
+                   min="1" step="0.1" required>
+
+            <label for="age">Age</label>
+            <input type="number" id="age" name="age"
+                   min="1" required>
+
+            <label for="sex">Sex (for BMR calculation)</label>
+            <select id="sex" name="sex">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+            </select>
+
+            <label for="activity_level">Activity Level</label>
+            <select id="activity_level" name="activity_level">
+                <option value="1.2">Sedentary</option>
+                <option value="1.375">Lightly Active</option>
+                <option value="1.55">Moderately Active</option>
+                <option value="1.725">Very Active</option>
+            </select>
+
+            <button type="submit">Calculate My Goals</button>
+        </form>
+
+        {% if goals %}
+        <section class="results">
+            <h2>Your Daily Goals</h2>
+
+            <div class="macro">
+                <span>Calories</span>
+                <strong>{{ goals.calories }} kcal</strong>
+            </div>
+
+            <div class="macro">
+                <span>Protein</span>
+                <strong>{{ goals.protein }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Carbohydrates</span>
+                <strong>{{ goals.carbs }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Fat</span>
+                <strong>{{ goals.fat }} g</strong>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>
