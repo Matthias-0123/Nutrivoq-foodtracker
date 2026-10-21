@@ -3,15 +3,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Progress Tracker</title>
+    <title>Progress Tracker - Nutrivoq</title>
 
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
-            defer></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
+        defer
+    ></script>
 </head>
 
 <body>
@@ -20,11 +24,13 @@
     <header class="dashboard-header">
         <div>
             <h1>Progress Tracker</h1>
-            <p>Track your weight and progress photos</p>
+            <p>Track your weight and progress photos with Nutrivoq.</p>
         </div>
 
-        <a class="secondary-button"
-           href="{{ url_for('dashboard') }}">
+        <a
+            class="secondary-button"
+            href="{{ url_for('dashboard') }}"
+        >
             Back to Dashboard
         </a>
     </header>
@@ -34,50 +40,61 @@
     {% endfor %}
 
     <section class="nutrition-card">
-        <h2>Add progress entry</h2>
+        <h2>Add Progress Entry</h2>
 
-        <form method="POST"
-              enctype="multipart/form-data"
-              class="progress-form">
+        <form
+            method="POST"
+            enctype="multipart/form-data"
+            class="progress-form"
+        >
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token() }}"
+            >
 
-            <input type="hidden"
-                   name="csrf_token"
-                   value="{{ csrf_token() }}">
+            <label for="weight">Weight (kg)</label>
+            <input
+                type="number"
+                id="weight"
+                name="weight"
+                min="0.1"
+                max="700"
+                step="0.1"
+                required
+            >
 
-            <label>
-                Weight (kg)
-                <input type="number"
-                       name="weight"
-                       min="0.1"
-                       max="700"
-                       step="0.1"
-                       required>
-            </label>
+            <label for="taken_at">Photo Taken At</label>
+            <input
+                type="datetime-local"
+                id="taken_at"
+                name="taken_at"
+                max="{{ now }}"
+                value="{{ now }}"
+                required
+            >
 
-            <label>
-                Photo taken at
-                <input type="datetime-local"
-                       name="taken_at"
-                       max="{{ now }}"
-                       value="{{ now }}"
-                       required>
-            </label>
+            <label for="photo">Progress Photo</label>
+            <input
+                type="file"
+                id="photo"
+                name="photo"
+                accept="image/jpeg,image/png,image/webp"
+                required
+            >
 
-            <label>
-                Progress photo
-                <input type="file"
-                       name="photo"
-                       accept="image/jpeg,image/png,image/webp"
-                       required>
-            </label>
-
-            <button type="submit">Save progress</button>
+            <button type="submit">
+                Save Progress
+            </button>
         </form>
     </section>
 
     <section class="nutrition-card">
-        <h2>Weight over time</h2>
-        <p>Click a point to view its progress photo below.</p>
+        <h2>Weight Over Time</h2>
+
+        <p class="muted">
+            Click a point on the graph to view its progress photo.
+        </p>
 
         {% if entries %}
 
@@ -85,130 +102,163 @@
                 <canvas id="weightChart"></canvas>
             </div>
 
-            <div id="selectedEntry"
-                 class="selected-entry"
-                 hidden>
-
+            <div
+                id="selectedEntry"
+                class="selected-entry"
+                hidden
+            >
                 <h3 id="entryDetails"></h3>
 
-                <img id="entryPhoto"
-                     alt="Selected progress photo">
+                <img
+                    id="entryPhoto"
+                    alt="Selected progress photo"
+                >
 
-                <form id="deleteEntry" method="POST">
-                    <input type="hidden"
-                           name="csrf_token"
-                           value="{{ csrf_token() }}">
+                <form
+                    id="deleteEntry"
+                    method="POST"
+                >
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
 
-                    <button type="submit"
-                            class="secondary-button"
-                            onclick="return confirm('Delete this progress entry?')">
-                        Delete entry
+                    <button
+                        type="submit"
+                        class="secondary-button"
+                        onclick="return confirm('Delete this progress entry?')"
+                    >
+                        Delete Entry
                     </button>
                 </form>
             </div>
 
         {% else %}
-            <p>No progress entries yet. Add your first photo above!</p>
+
+            <p>
+                No progress entries yet. Add your first photo above!
+            </p>
+
         {% endif %}
     </section>
+
 </main>
 
 <script>
-window.addEventListener("DOMContentLoaded", () => {
-    const entries = {{ entries | tojson }};
+    window.addEventListener("DOMContentLoaded", () => {
+        const entries = {{ entries | tojson }};
 
-    if (!entries.length) {
-        return;
-    }
+        if (entries.length === 0) {
+            return;
+        }
 
-    const chartCanvas = document.getElementById("weightChart");
+        const chartCanvas = document.getElementById("weightChart");
 
-    const chart = new Chart(chartCanvas, {
-        type: "line",
+        const chart = new Chart(chartCanvas, {
+            type: "line",
 
-        data: {
-            labels: entries.map(entry =>
-                new Date(entry.taken_at).toLocaleDateString()
-            ),
+            data: {
+                labels: entries.map(entry =>
+                    new Date(entry.taken_at).toLocaleDateString()
+                ),
 
-            datasets: [{
-                label: "Weight (kg)",
-                data: entries.map(entry => entry.weight),
-                borderColor: "#22c55e",
-                backgroundColor: "#22c55e",
-                pointRadius: 6,
-                pointHoverRadius: 10,
-                hitRadius: 12,
-                tension: 0.25
-            }]
-        },
+                datasets: [{
+                    label: "Weight (kg)",
 
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+                    data: entries.map(entry => entry.weight),
 
-            interaction: {
-                mode: "nearest",
-                intersect: true
+                    borderColor: "#22c55e",
+                    backgroundColor: "#22c55e",
+
+                    pointRadius: 6,
+                    pointHoverRadius: 10,
+
+                    tension: 0.25
+                }]
             },
 
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
 
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: "Weight (kg)"
+                interaction: {
+                    mode: "nearest",
+                    intersect: true
+                },
+
+                plugins: {
+                    legend: {
+                        display: false
                     }
                 },
 
-                x: {
-                    title: {
-                        display: true,
-                        text: "Date"
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: "Weight (kg)"
+                        }
+                    },
+
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Date"
+                        }
+                    }
+                },
+
+                onClick: (event, points) => {
+                    if (points.length > 0) {
+                        selectEntry(points[0].index);
                     }
                 }
-            },
-
-            onClick: (event, points) => {
-                if (points.length) {
-                    selectEntry(points[0].index);
-                }
             }
-        }
-    });
+        });
 
-    function selectEntry(index) {
-        const entry = entries[index];
+        function selectEntry(index) {
+            const entry = entries[index];
 
-        const selectedEntry = document.getElementById("selectedEntry");
-        const entryDetails = document.getElementById("entryDetails");
-        const entryPhoto = document.getElementById("entryPhoto");
-        const deleteEntry = document.getElementById("deleteEntry");
-
-        selectedEntry.hidden = false;
-
-        entryDetails.textContent =
-            `${entry.weight} kg — ${new Date(entry.taken_at).toLocaleString()}`;
-
-        entryPhoto.src = `/progress/photo/${entry.id}`;
-
-        deleteEntry.action = `/progress/delete/${entry.id}`;
-
-        chart.data.datasets[0].pointBackgroundColor =
-            entries.map((item, pointIndex) =>
-                pointIndex === index ? "#f59e0b" : "#22c55e"
+            const selectedEntry = document.getElementById(
+                "selectedEntry"
             );
 
-        chart.update();
-    }
+            const entryDetails = document.getElementById(
+                "entryDetails"
+            );
 
-    selectEntry(entries.length - 1);
-});
+            const entryPhoto = document.getElementById(
+                "entryPhoto"
+            );
+
+            const deleteForm = document.getElementById(
+                "deleteEntry"
+            );
+
+            selectedEntry.hidden = false;
+
+            entryDetails.textContent =
+                `${entry.weight} kg — ` +
+                new Date(entry.taken_at).toLocaleString();
+
+            entryPhoto.src = `/progress/photo/${entry.id}`;
+
+            deleteForm.action = `/progress/delete/${entry.id}`;
+
+            chart.data.datasets[0].pointBackgroundColor =
+                entries.map((_, entryIndex) =>
+                    entryIndex === index
+                        ? "#f59e0b"
+                        : "#22c55e"
+                );
+
+            chart.update();
+        }
+
+        selectEntry(entries.length - 1);
+    });
 </script>
+
 </body>
 </html>
