@@ -179,10 +179,19 @@ def search_products_api():
 
 
 
+
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
+
+    user_id = session["user_id"]
+
+    with get_database() as connection:
+        current_goals = connection.execute(
+            "SELECT * FROM user_goals WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
 
     if request.method == "POST":
         try:
@@ -190,32 +199,50 @@ def setup():
             height = float(request.form["height"])
             age = int(request.form["age"])
             sex = request.form["sex"]
-            activity_level = float(request.form["activity_level"])
+            activity_level = request.form["activity_level"]
+            goal = request.form.get("goal", "maintain")
 
             if not all(
                 math.isfinite(value)
-                for value in (weight, height, activity_level)
+                for value in (weight, height)
             ):
                 raise ValueError
 
-            if not 0 < weight <= 500:
+            if not 30 <= weight <= 400:
                 raise ValueError
 
-            if not 0 < height <= 300:
+            if not 100 <= height <= 250:
                 raise ValueError
 
-            if not 0 < age <= 120:
+            if not 18 <= age <= 120:
                 raise ValueError
 
             if sex not in ("male", "female"):
                 raise ValueError
 
-            if activity_level not in (
-                1.2, 1.375, 1.55, 1.725
-            ):
+            valid_activity_levels = {
+                "sedentary": 1.2,
+                "light": 1.375,
+                "moderate": 1.55,
+                "active": 1.725,
+                "very_active": 1.9
+            }
+
+            if activity_level in valid_activity_levels:
+                activity_multiplier = valid_activity_levels[activity_level]
+            else:
+                activity_multiplier = float(activity_level)
+
+                if not math.isfinite(activity_multiplier):
+                    raise ValueError
+
+                if activity_multiplier not in valid_activity_levels.values():
+                    raise ValueError
+
+            if goal not in ("gain", "maintain", "lose"):
                 raise ValueError
 
-        except (ValueError, KeyError):
+        except (ValueError, TypeError, KeyError):
             flash("Please enter valid profile information.")
             return redirect(url_for("setup"))
 
@@ -224,36 +251,67 @@ def setup():
             height,
             age,
             sex,
-            activity_level
+            activity_multiplier,
+            goal
         )
 
-        goals = calculate_macros(calorie_goal, weight)
+        goals = calculate_macros(
+            calorie_goal,
+            weight,
+            goal
+        )
 
         with get_database() as connection:
             connection.execute(
                 """
                 INSERT INTO user_goals (
-                    user_id, calories, protein, carbs, fat
+                    user_id,
+                    calories,
+                    protein,
+                    carbs,
+                    fat,
+                    goal,
+                    age,
+                    sex,
+                    height,
+                    weight,
+                    activity_level
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     calories = excluded.calories,
                     protein = excluded.protein,
                     carbs = excluded.carbs,
-                    fat = excluded.fat
+                    fat = excluded.fat,
+                    goal = excluded.goal,
+                    age = excluded.age,
+                    sex = excluded.sex,
+                    height = excluded.height,
+                    weight = excluded.weight,
+                    activity_level = excluded.activity_level
                 """,
                 (
-                    session["user_id"],
+                    user_id,
                     goals["calories"],
                     goals["protein"],
                     goals["carbs"],
-                    goals["fat"]
+                    goals["fat"],
+                    goal,
+                    age,
+                    sex,
+                    height,
+                    weight,
+                    activity_level
                 )
             )
 
+        flash("Your nutrition goals have been updated.")
         return redirect(url_for("dashboard"))
 
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        current_goals=current_goals
+    )
 
 
 @app.route("/food/add", methods=["GET", "POST"])

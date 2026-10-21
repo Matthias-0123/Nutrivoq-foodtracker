@@ -24,14 +24,14 @@ def initialize_database():
             )
         """)
 
-        columns = {
+        user_columns = {
             column["name"]
             for column in connection.execute(
                 "PRAGMA table_info(users)"
             ).fetchall()
         }
 
-        if "username" not in columns:
+        if "username" not in user_columns:
             connection.execute(
                 "ALTER TABLE users ADD COLUMN username TEXT"
             )
@@ -76,6 +76,29 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+
+        goal_columns = {
+            column["name"]
+            for column in connection.execute(
+                "PRAGMA table_info(user_goals)"
+            ).fetchall()
+        }
+
+        new_goal_columns = {
+            "goal": "TEXT NOT NULL DEFAULT 'maintain'",
+            "age": "INTEGER",
+            "sex": "TEXT",
+            "height": "REAL",
+            "weight": "REAL",
+            "activity_level": "TEXT"
+        }
+
+        for column_name, column_definition in new_goal_columns.items():
+            if column_name not in goal_columns:
+                connection.execute(
+                    f"ALTER TABLE user_goals "
+                    f"ADD COLUMN {column_name} {column_definition}"
+                )
 
         connection.execute("""
             CREATE TABLE IF NOT EXISTS food_entries (

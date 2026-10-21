@@ -5,100 +5,131 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nutrition Goals - Nutrivoq</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <main class="container">
-        {% for message in get_flashed_messages() %}
-            <p class="message">{{ message }}</p>
-        {% endfor %}
+<main class="container">
+    <h1>Nutrivoq</h1>
+    <h2>Set Your Nutrition Goals</h2>
 
-        <h1>Nutrivoq</h1>
-        <p>Calculate your daily calorie and macro goals.</p>
+    <p>Tell us about yourself to calculate your daily calorie and macro targets.</p>
 
-        <form method="POST" action="{{ url_for('setup') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
 
-            <label for="weight">Weight (kg)</label>
-            <input
-                type="number"
-                id="weight"
-                name="weight"
-                min="0.1"
-                max="500"
-                step="0.1"
-                required
-            >
+    <form method="POST">
+        <input type="hidden"
+               name="csrf_token"
+               value="{{ csrf_token() }}">
 
-            <label for="height">Height (cm)</label>
-            <input
-                type="number"
-                id="height"
-                name="height"
-                min="1"
-                max="300"
-                step="0.1"
-                required
-            >
+        <h2>What's Your Goal?</h2>
 
-            <label for="age">Age</label>
-            <input
-                type="number"
-                id="age"
-                name="age"
-                min="1"
-                max="120"
-                required
-            >
+        <label for="goal">Fitness Goal</label>
+        <select id="goal" name="goal" required>
+            <option value="gain"
+                {% if current_goals and current_goals['goal'] == 'gain' %}selected{% endif %}>
+                Gain Weight
+            </option>
+            <option value="maintain"
+                {% if not current_goals or current_goals['goal'] == 'maintain' %}selected{% endif %}>
+                Maintain Weight
+            </option>
+            <option value="lose"
+                {% if current_goals and current_goals['goal'] == 'lose' %}selected{% endif %}>
+                Lose Weight
+            </option>
+        </select>
 
-            <label for="sex">Sex (for BMR calculation)</label>
-            <select id="sex" name="sex" required>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-            </select>
+        <h2>Your Information</h2>
 
-            <label for="activity_level">Activity Level</label>
-            <select id="activity_level" name="activity_level" required>
-                <option value="1.2">Sedentary</option>
-                <option value="1.375">Lightly Active</option>
-                <option value="1.55">Moderately Active</option>
-                <option value="1.725">Very Active</option>
-            </select>
+        <label for="age">Age</label>
+        <input
+            type="number"
+            id="age"
+            name="age"
+            min="18"
+            max="120"
+            value="{{ current_goals['age'] if current_goals and current_goals['age'] is not none else '' }}"
+            required
+        >
 
-            <button type="submit">Calculate My Goals</button>
-        </form>
+        <label for="sex">Sex Used for Calculation</label>
+        <select id="sex" name="sex" required>
+            <option value="">Select an option</option>
+            <option value="male"
+                {% if current_goals and current_goals['sex'] == 'male' %}selected{% endif %}>
+                Male
+            </option>
+            <option value="female"
+                {% if current_goals and current_goals['sex'] == 'female' %}selected{% endif %}>
+                Female
+            </option>
+        </select>
 
-        {% if goals %}
-            <section class="results">
-                <h2>Your Daily Goals</h2>
+        <label for="height">Height (cm)</label>
+        <input
+            type="number"
+            id="height"
+            name="height"
+            min="100"
+            max="250"
+            step="0.1"
+            value="{{ current_goals['height'] if current_goals and current_goals['height'] is not none else '' }}"
+            required
+        >
 
-                <div class="macro">
-                    <span>Calories</span>
-                    <strong>{{ goals.calories }} kcal</strong>
-                </div>
+        <label for="weight">Current Weight (kg)</label>
+        <input
+            type="number"
+            id="weight"
+            name="weight"
+            min="30"
+            max="400"
+            step="0.1"
+            value="{{ current_goals['weight'] if current_goals and current_goals['weight'] is not none else '' }}"
+            required
+        >
 
-                <div class="macro">
-                    <span>Protein</span>
-                    <strong>{{ goals.protein }} g</strong>
-                </div>
+        <label for="activity_level">Activity Level</label>
+        <select id="activity_level" name="activity_level" required>
+            {% set activity = current_goals['activity_level'] if current_goals else '' %}
 
-                <div class="macro">
-                    <span>Carbohydrates</span>
-                    <strong>{{ goals.carbs }} g</strong>
-                </div>
+            <option value="">Select activity level</option>
 
-                <div class="macro">
-                    <span>Fat</span>
-                    <strong>{{ goals.fat }} g</strong>
-                </div>
-            </section>
-        {% endif %}
+            <option value="sedentary"
+                {% if activity in ['sedentary', '1.2'] %}selected{% endif %}>
+                Sedentary - Little or no exercise
+            </option>
 
-        <p>
-            <a href="{{ url_for('dashboard') }}">
-                Back to Dashboard
-            </a>
-        </p>
-    </main>
+            <option value="light"
+                {% if activity in ['light', '1.375'] %}selected{% endif %}>
+                Lightly Active - 1-3 days/week
+            </option>
+
+            <option value="moderate"
+                {% if activity in ['moderate', '1.55'] %}selected{% endif %}>
+                Moderately Active - 3-5 days/week
+            </option>
+
+            <option value="active"
+                {% if activity in ['active', '1.725'] %}selected{% endif %}>
+                Very Active - 6-7 days/week
+            </option>
+
+            <option value="very_active"
+                {% if activity in ['very_active', '1.9'] %}selected{% endif %}>
+                Extremely Active - Intense daily exercise
+            </option>
+        </select>
+
+        <button type="submit">Calculate My Goals</button>
+    </form>
+
+    <p>
+        <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+    </p>
+</main>
 </body>
 </html>

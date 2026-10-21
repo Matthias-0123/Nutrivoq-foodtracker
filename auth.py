@@ -1,4 +1,5 @@
 
+import math
 import re
 import sqlite3
 
@@ -19,6 +20,12 @@ from werkzeug.security import (
 
 from database import get_database
 from extensions import limiter
+from nutrition import (
+    ACTIVITY_LEVELS,
+    GOAL_ADJUSTMENTS,
+    calculate_calorie_goal,
+    calculate_macros
+)
 
 
 auth = Blueprint("auth", __name__)
@@ -30,6 +37,47 @@ EMAIL_PATTERN = re.compile(
 USERNAME_PATTERN = re.compile(
     r"^[A-Za-z0-9_]{3,20}$"
 )
+
+
+def read_registration_profile():
+    try:
+        age = int(request.form["age"])
+        height = float(request.form["height"])
+        weight = float(request.form["weight"])
+
+        sex = request.form["sex"]
+        activity_level = request.form["activity_level"]
+        goal = request.form["goal"]
+
+        if not 18 <= age <= 120:
+            raise ValueError
+
+        if not math.isfinite(height) or not 100 <= height <= 250:
+            raise ValueError
+
+        if not math.isfinite(weight) or not 30 <= weight <= 400:
+            raise ValueError
+
+        if sex not in ("male", "female"):
+            raise ValueError
+
+        if activity_level not in ACTIVITY_LEVELS:
+            raise ValueError
+
+        if goal not in GOAL_ADJUSTMENTS:
+            raise ValueError
+
+        return {
+            "age": age,
+            "height": height,
+            "weight": weight,
+            "sex": sex,
+            "activity_level": activity_level,
+            "goal": goal
+        }
+
+    except (ValueError, TypeError, KeyError):
+        return None
 
 
 @auth.route("/register", methods=["GET", "POST"])
@@ -58,43 +106,99 @@ def register():
             flash("Password must contain 8-128 characters.")
             return render_template("register.html")
 
-        with get_database() as connection:
-            existing_username = connection.execute(
-                """
-                SELECT id FROM users
-                WHERE username = ? COLLATE NOCASE
-                """,
-                (username,)
-            ).fetchone()
+        profile = read_registration_profile()
 
-            existing_email = connection.execute(
-                """
-                SELECT id FROM users
-                WHERE email = ? COLLATE NOCASE
-                """,
-                (email,)
-            ).fetchone()
-
-        if existing_username:
-            flash("This username is already taken.")
+        if profile is None:
+            flash("Please enter valid personal information.")
             return render_template("register.html")
 
-        if existing_email:
-            flash("An account with this email already exists.")
-            return render_template("register.html")
+        calorie_goal = calculate_calorie_goal(
+            profile["weight"],
+            profile["height"],
+            profile["age"],
+            profile["sex"],
+            profile["activity_level"],
+            profile["goal"]
+        )
+
+        macros = calculate_macros(
+            calorie_goal,
+            profile["weight"],
+            profile["goal"]
+        )
 
         password_hash = generate_password_hash(password)
 
         try:
             with get_database() as connection:
-                connection.execute(
+                existing_username = connection.execute(
+                    """
+                    SELECT id FROM users
+                    WHERE username = ? COLLATE NOCASE
+                    """,
+                    (username,)
+                ).fetchone()
+
+                existing_email = connection.execute(
+                    """
+                    SELECT id FROM users
+                    WHERE email = ? COLLATE NOCASE
+                    """,
+                    (email,)
+                ).fetchone()
+
+                if existing_username:
+                    flash("This username is already taken.")
+                    return render_template("register.html")
+
+                if existing_email:
+                    flash("An account with this email already exists.")
+                    return render_template("register.html")
+
+                cursor = connection.execute(
                     """
                     INSERT INTO users (
-                        username, email, password_hash
+                        username,
+                        email,
+                        password_hash
                     )
                     VALUES (?, ?, ?)
                     """,
                     (username, email, password_hash)
+                )
+
+                user_id = cursor.lastrowid
+
+                connection.execute(
+                    """
+                    INSERT INTO user_goals (
+                        user_id,
+                        calories,
+                        protein,
+                        carbs,
+                        fat,
+                        goal,
+                        age,
+                        sex,
+                        height,
+                        weight,
+                        activity_level
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        macros["calories"],
+                        macros["protein"],
+                        macros["carbs"],
+                        macros["fat"],
+                        profile["goal"],
+                        profile["age"],
+                        profile["sex"],
+                        profile["height"],
+                        profile["weight"],
+                        profile["activity_level"]
+                    )
                 )
 
         except sqlite3.IntegrityError:
