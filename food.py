@@ -4,17 +4,17 @@ from datetime import date
 from database import get_database
 
 
-def add_food(user_id, food_name, amount, calories, protein, carbs, fat):
+def add_food(user_id, food_name, amount, calories, protein, carbs, fat, barcode=None):
     with get_database() as connection:
         connection.execute("""
             INSERT INTO food_entries (
                 user_id, food_name, amount, calories,
-                protein, carbs, fat, entry_date
+                protein, carbs, fat, entry_date, barcode
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             user_id, food_name, amount, calories,
-            protein, carbs, fat, date.today().isoformat()
+            protein, carbs, fat, date.today().isoformat(), barcode
         ))
 
 

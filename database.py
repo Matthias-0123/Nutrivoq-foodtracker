@@ -115,6 +115,23 @@ def initialize_database():
             )
         """)
 
+        food_columns = {
+            column["name"]
+            for column in connection.execute(
+                "PRAGMA table_info(food_entries)"
+            ).fetchall()
+        }
+
+        if "barcode" not in food_columns:
+            connection.execute(
+                "ALTER TABLE food_entries ADD COLUMN barcode TEXT"
+            )
+
+        connection.execute("""
+            CREATE INDEX IF NOT EXISTS idx_food_entries_user_barcode
+            ON food_entries(user_id, barcode)
+        """)
+
         connection.execute("""
             CREATE TABLE IF NOT EXISTS favorite_foods (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

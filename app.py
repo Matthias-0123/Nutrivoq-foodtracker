@@ -1,8 +1,8 @@
+
 import math
 import os
 import re
 import requests
-import traceback
 
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
@@ -35,7 +35,13 @@ from favorites import (
     add_favorite_to_daily_tracker,
     delete_favorite
 )
-from product_api import search_products, get_product
+from product_api import (
+    search_products,
+    get_product,
+    normalize_text,
+    sort_products,
+    PAGE_SIZE
+)
 from progress import progress
 
 
@@ -139,7 +145,6 @@ def dashboard():
     )
 
 
-
 @app.route("/api/products/search")
 @limiter.limit("30 per minute")
 def search_products_api():
@@ -153,7 +158,7 @@ def search_products_api():
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid page"}), 400
 
-    if page < 1 or page > 1000:
+    if not 1 <= page <= 1000:
         return jsonify({"error": "Invalid page"}), 400
 
     if len(query) < 3:
@@ -168,16 +173,168 @@ def search_products_api():
         return jsonify({"error": "Search query too long"}), 400
 
     try:
-        results = search_products(query, page)
+        user_id = session["user_id"]
+        normalized_query = normalize_text(query)
+
+        with get_database() as connection:
+            history = connection.execute(
+                """
+                SELECT *
+                FROM food_entries
+                WHERE user_id = ?
+                ORDER BY id DESC
+                """,
+                (user_id,)
+            ).fetchall()
+
+        previous_names = [
+            entry["food_name"]
+            for entry in history
+        ]
+
+        history_products = []
+        seen_history = set()
+
+        for entry in history:
+            name = entry["food_name"]
+            normalized_name = normalize_text(name)
+            barcode = entry["barcode"]
+
+            if normalized_query not in normalized_name:
+                continue
+
+            identity = (barcode or "", normalized_name)
+
+            if identity in seen_history:
+                continue
+
+            amount = entry["amount"]
+
+            if not amount or amount <= 0:
+                continue
+
+            seen_history.add(identity)
+
+            multiplier = 100 / amount
+
+            history_products.append({
+                "barcode": barcode or "",
+                "history_id": entry["id"],
+                "name": name,
+                "brand": "Previously logged",
+                "image": "",
+                "calories": round(entry["calories"] * multiplier, 1),
+                "protein": round(entry["protein"] * multiplier, 1),
+                "carbs": round(entry["carbs"] * multiplier, 1),
+                "fat": round(entry["fat"] * multiplier, 1),
+                "previously_logged": True
+            })
+
+        try:
+            results = search_products(query, page, previous_names)
+
+        except (requests.RequestException, ValueError) as error:
+            app.logger.warning("Open Food Facts unavailable: %s", error)
+
+            results = {
+                "products": [],
+                "page": page,
+                "total_pages": 0,
+                "total_results": 0
+            }
+
+        if page == 1:
+            history_products = sort_products(
+                history_products,
+                query,
+                previous_names
+            )
+
+            history_barcodes = {
+                product["barcode"]
+                for product in history_products
+                if product["barcode"]
+            }
+
+            api_products = [
+                product
+                for product in results["products"]
+                if product["barcode"] not in history_barcodes
+            ]
+
+            results["products"] = (
+                history_products + api_products
+            )[:PAGE_SIZE]
+
+            results["total_results"] += len(history_products)
+
+            if len(history_products) > PAGE_SIZE:
+                results["total_pages"] = max(
+                    results["total_pages"],
+                    2
+                )
+
         return jsonify(results)
 
     except Exception:
         app.logger.exception("Product search failed")
+
         return jsonify({
             "error": "Product search unavailable"
         }), 502
 
 
+@app.route("/food/reuse/<int:entry_id>", methods=["GET", "POST"])
+def reuse_food(entry_id):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    with get_database() as connection:
+        entry = connection.execute(
+            """
+            SELECT *
+            FROM food_entries
+            WHERE id = ? AND user_id = ?
+            """,
+            (entry_id, session["user_id"])
+        ).fetchone()
+
+    if entry is None:
+        return "Food entry not found.", 404
+
+    if request.method == "POST":
+        try:
+            amount = float(request.form["amount"])
+
+            if not math.isfinite(amount) or not 0 < amount <= 10000:
+                raise ValueError
+
+        except (ValueError, KeyError):
+            flash("Please enter a valid amount.")
+            return redirect(
+                url_for("reuse_food", entry_id=entry_id)
+            )
+
+        multiplier = amount / entry["amount"]
+
+        add_food(
+            session["user_id"],
+            entry["food_name"],
+            amount,
+            round(entry["calories"] * multiplier, 1),
+            round(entry["protein"] * multiplier, 1),
+            round(entry["carbs"] * multiplier, 1),
+            round(entry["fat"] * multiplier, 1),
+            barcode=entry["barcode"]
+        )
+
+        flash("Food added successfully.")
+        return redirect(url_for("dashboard"))
+
+    return render_template(
+        "reuse_food.html",
+        entry=entry
+    )
 
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -335,7 +492,10 @@ def add_food_page():
                 raise ValueError
 
             nutrition_values = (
-                calories, protein, carbs, fat
+                calories,
+                protein,
+                carbs,
+                fat
             )
 
             if not all(
@@ -346,7 +506,9 @@ def add_food_page():
 
         except (ValueError, KeyError):
             flash("Please enter valid food information.")
-            return redirect(url_for("search_food", tab="manual"))
+            return redirect(
+                url_for("search_food", tab="manual")
+            )
 
         add_food(
             session["user_id"],
@@ -358,7 +520,9 @@ def add_food_page():
             fat
         )
 
-        return redirect(url_for("search_food", tab="manual"))
+        return redirect(
+            url_for("search_food", tab="manual")
+        )
 
     return render_template("add_food.html")
 
@@ -379,15 +543,24 @@ def search_food():
         return redirect(url_for("auth.login"))
 
     user_id = session["user_id"]
-    selected_date = request.args.get("date", date.today().isoformat())
+    selected_date = request.args.get(
+        "date",
+        date.today().isoformat()
+    )
 
     try:
         datetime.strptime(selected_date, "%Y-%m-%d")
     except ValueError:
         selected_date = date.today().isoformat()
 
-    history_entries = get_daily_food(user_id, selected_date)
-    history_totals = calculate_daily_totals(history_entries)
+    history_entries = get_daily_food(
+        user_id,
+        selected_date
+    )
+
+    history_totals = calculate_daily_totals(
+        history_entries
+    )
 
     with get_database() as connection:
         goals = connection.execute(
@@ -436,17 +609,34 @@ def select_food(barcode):
 
         except (ValueError, KeyError):
             flash("Please enter a valid amount.")
-            return redirect(url_for("select_food", barcode=barcode))
+            return redirect(
+                url_for("select_food", barcode=barcode)
+            )
 
         multiplier = amount / 100
 
-        calories = round(product["calories"] * multiplier, 1)
-        protein = round(product["protein"] * multiplier, 1)
-        carbs = round(product["carbs"] * multiplier, 1)
-        fat = round(product["fat"] * multiplier, 1)
+        calories = round(
+            product["calories"] * multiplier,
+            1
+        )
+        protein = round(
+            product["protein"] * multiplier,
+            1
+        )
+        carbs = round(
+            product["carbs"] * multiplier,
+            1
+        )
+        fat = round(
+            product["fat"] * multiplier,
+            1
+        )
 
         nutrition_values = (
-            calories, protein, carbs, fat
+            calories,
+            protein,
+            carbs,
+            fat
         )
 
         if not all(
@@ -454,7 +644,9 @@ def select_food(barcode):
             for value in nutrition_values
         ):
             flash("Invalid nutritional information.")
-            return redirect(url_for("select_food", barcode=barcode))
+            return redirect(
+                url_for("select_food", barcode=barcode)
+            )
 
         add_food(
             session["user_id"],
@@ -463,7 +655,8 @@ def select_food(barcode):
             calories,
             protein,
             carbs,
-            fat
+            fat,
+            barcode=barcode
         )
 
         flash("Food added successfully.")
@@ -517,7 +710,9 @@ def favorites_page():
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    favorites = get_favorites(session["user_id"])
+    favorites = get_favorites(
+        session["user_id"]
+    )
 
     return render_template(
         "favorites.html",
@@ -530,7 +725,10 @@ def save_favorite_entry(entry_id):
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    saved = save_favorite(session["user_id"], entry_id)
+    saved = save_favorite(
+        session["user_id"],
+        entry_id
+    )
 
     if saved:
         flash("Food saved to favorites.")
@@ -553,7 +751,9 @@ def add_favorite_entry(favorite_id):
 
     except (ValueError, KeyError):
         flash("Please enter a valid amount.")
-        return redirect(url_for("search_food", tab="favorites"))
+        return redirect(
+            url_for("search_food", tab="favorites")
+        )
 
     added = add_favorite_to_daily_tracker(
         session["user_id"],
@@ -563,10 +763,14 @@ def add_favorite_entry(favorite_id):
 
     if added:
         flash("Favorite added to today's food.")
-        return redirect(url_for("search_food", tab="favorites"))
+        return redirect(
+            url_for("search_food", tab="favorites")
+        )
 
     flash("Favorite not found.")
-    return redirect(url_for("search_food", tab="favorites"))
+    return redirect(
+        url_for("search_food", tab="favorites")
+    )
 
 
 @app.route("/favorites/delete/<int:favorite_id>", methods=["POST"])
@@ -574,10 +778,15 @@ def delete_favorite_entry(favorite_id):
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    delete_favorite(session["user_id"], favorite_id)
+    delete_favorite(
+        session["user_id"],
+        favorite_id
+    )
 
     flash("Favorite removed.")
-    return redirect(url_for("search_food", tab="favorites"))
+    return redirect(
+        url_for("search_food", tab="favorites")
+    )
 
 
 @app.route("/food/scan")

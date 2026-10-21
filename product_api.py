@@ -5,6 +5,7 @@ import os
 import re
 import time
 import unicodedata
+
 from collections import OrderedDict
 from threading import Lock
 
@@ -158,7 +159,7 @@ def format_product(product):
 
 def calculate_relevance(product, search_query):
     name = normalize_text(product["name"])
-    brand = normalize_text(product["brand"])
+    brand = normalize_text(product.get("brand", ""))
     query = normalize_text(search_query)
 
     if not query:
@@ -167,38 +168,57 @@ def calculate_relevance(product, search_query):
     name_words = name.split()
     query_words = query.split()
 
-    score = 0
-
     if name == query:
-        score += 1000
+        score = 10000
 
     elif name.startswith(query + " "):
-        score += 800
-
-    elif name.endswith(" " + query):
-        score += 700
-
-    elif query in name_words:
-        score += 600
-
-    elif query in name:
-        score += 300
+        score = 8000
 
     elif all(word in name_words for word in query_words):
-        score += 250
+        score = 6000
+
+    elif query in name:
+        score = 3000
 
     elif all(word in name for word in query_words):
-        score += 100
+        score = 1500
 
-    if query in brand:
-        score += 20
+    elif query in brand:
+        score = 500
+
+    else:
+        score = 0
+
+    score -= len(name_words) * 20
 
     if product.get("image"):
         score += 5
 
-    score -= min(len(name_words), 20) * 2
+    processed_food_words = {
+        "noodles",
+        "noodle",
+        "instant",
+        "flavour",
+        "flavor",
+        "chips",
+        "crisps",
+        "soup",
+        "sauce",
+        "pizza",
+        "snack",
+        "ramen",
+        "biscuits",
+        "cookies",
+        "chocolate"
+    }
 
-    milk_queries = {"melk", "milk"}
+    if len(query_words) == 1 and query in name_words:
+        extra_words = set(name_words) - set(query_words)
+
+        if extra_words & processed_food_words:
+            score -= 3500
+
+    milk_queries = {"milk", "melk"}
 
     milk_types = {
         "volle",
@@ -207,57 +227,46 @@ def calculate_relevance(product, search_query):
         "houdbare",
         "verse",
         "whole",
-        "semi skimmed",
+        "semi",
         "skimmed",
         "fresh"
     }
 
     if query in milk_queries:
         if name == query:
-            score += 500
+            score += 1500
 
         if any(
-            name == f"{milk_type} {query}"
-            or name.startswith(f"{milk_type} {query} ")
+            name.startswith(f"{milk_type} {query}")
             for milk_type in milk_types
         ):
-            score += 450
-
-        if name.startswith(query + " "):
-            score += 200
-
-        unrelated_categories = {
-            "chocolade",
-            "chocolate",
-            "reep",
-            "bar",
-            "koek",
-            "cookie",
-            "biscuit",
-            "skyr",
-            "yoghurt",
-            "yogurt",
-            "pudding",
-            "ijs",
-            "ice cream"
-        }
-
-        if any(
-            category in name_words
-            for category in unrelated_categories
-        ):
-            score -= 500
+            score += 1000
 
     return score
 
 
-def sort_products(products, search_query):
+
+def sort_products(products, search_query, previous_names=None):
+    ranked_products = []
+
+    for product in products:
+        product_copy = product.copy()
+
+        product_copy["previously_logged"] = bool(
+            product_copy.get("history_id")
+            or product_copy.get("previously_logged", False)
+        )
+
+        ranked_products.append(product_copy)
+
     return sorted(
-        products,
+        ranked_products,
         key=lambda product: (
+            not product["previously_logged"],
             -calculate_relevance(product, search_query),
+            len(normalize_text(product["name"]).split()),
             normalize_text(product["name"]),
-            product["barcode"]
+            product.get("barcode", "")
         )
     )
 
@@ -301,9 +310,9 @@ def create_search_state():
     }
 
 
-def get_ranked_products(search_query, minimum_results=20):
+def get_ranked_products(search_query, minimum_results=150):
     query = search_query.strip()
-    cache_key = ("ranked_search", query.casefold())
+    cache_key = ("ranked_search_v3", query.casefold())
 
     cached = get_cached(cache_key)
 
@@ -383,7 +392,7 @@ def get_ranked_products(search_query, minimum_results=20):
     return state
 
 
-def search_products(search_query, page=1):
+def search_products(search_query, page=1, previous_names=None):
     query = search_query.strip()
     page = max(1, int(page))
 
@@ -395,14 +404,21 @@ def search_products(search_query, page=1):
             "total_results": 0
         }
 
-    minimum_results = page * PAGE_SIZE
+    minimum_results = max(
+        150,
+        page * PAGE_SIZE
+    )
 
     state = get_ranked_products(
         query,
         minimum_results
     )
 
-    products = state["products"]
+    products = sort_products(
+        state["products"],
+        query,
+        previous_names
+    )
 
     start_index = (page - 1) * PAGE_SIZE
     end_index = start_index + PAGE_SIZE

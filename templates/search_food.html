@@ -38,12 +38,6 @@
             display: none !important;
         }
 
-        @media (max-width: 450px) {
-            .food-hub-navigation {
-                grid-template-columns: 1fr;
-            }
-        }
-
         .search-form {
             display: flex;
             flex-direction: column;
@@ -75,7 +69,6 @@
             background: #1e293b;
             color: #ffffff;
             text-decoration: none;
-            cursor: pointer;
             box-sizing: border-box;
         }
 
@@ -114,6 +107,18 @@
             margin: 0 0 8px;
         }
 
+        .previously-logged {
+            display: inline-block;
+            color: #86efac;
+            background: #14532d;
+            border: 1px solid #22c55e;
+            border-radius: 6px;
+            padding: 5px 9px;
+            margin: 0 0 10px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
         .pagination {
             display: flex;
             align-items: center;
@@ -131,6 +136,11 @@
             cursor: not-allowed;
         }
 
+        .container > .action-link {
+            width: 100%;
+            margin-top: 16px;
+        }
+
         @media (max-width: 600px) {
             .product-card {
                 flex-direction: column;
@@ -144,6 +154,12 @@
             .scan-button {
                 width: 48px;
                 min-width: 48px;
+            }
+        }
+
+        @media (max-width: 450px) {
+            .food-hub-navigation {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -253,28 +269,68 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <label for="food_name">Food Name</label>
-            <input type="text" id="food_name" name="food_name"
-                   maxlength="100" required>
+            <input
+                type="text"
+                id="food_name"
+                name="food_name"
+                maxlength="100"
+                required
+            >
 
             <label for="amount">Amount (g)</label>
-            <input type="number" id="amount" name="amount"
-                   min="0.1" max="10000" step="0.1" required>
+            <input
+                type="number"
+                id="amount"
+                name="amount"
+                min="0.1"
+                max="10000"
+                step="0.1"
+                required
+            >
 
             <label for="calories">Calories (kcal)</label>
-            <input type="number" id="calories" name="calories"
-                   min="0" max="100000" step="0.1" required>
+            <input
+                type="number"
+                id="calories"
+                name="calories"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
 
             <label for="protein">Protein (g)</label>
-            <input type="number" id="protein" name="protein"
-                   min="0" max="100000" step="0.1" required>
+            <input
+                type="number"
+                id="protein"
+                name="protein"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
 
             <label for="carbs">Carbohydrates (g)</label>
-            <input type="number" id="carbs" name="carbs"
-                   min="0" max="100000" step="0.1" required>
+            <input
+                type="number"
+                id="carbs"
+                name="carbs"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
 
             <label for="fat">Fat (g)</label>
-            <input type="number" id="fat" name="fat"
-                   min="0" max="100000" step="0.1" required>
+            <input
+                type="number"
+                id="fat"
+                name="fat"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
 
             <button type="submit">Add Food</button>
         </form>
@@ -282,6 +338,7 @@
 
     <section class="hub-panel" data-panel="favorites" hidden>
         <h2>My Favorites</h2>
+
         <p class="muted">
             Quickly add your favorite foods to today's tracker.
         </p>
@@ -318,9 +375,11 @@
                     method="POST"
                     action="{{ url_for('add_favorite_entry', favorite_id=favorite.id) }}"
                 >
-                    <input type="hidden"
-                           name="csrf_token"
-                           value="{{ csrf_token() }}">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
 
                     <label for="favorite-amount-{{ favorite.id }}">
                         Amount (g)
@@ -344,9 +403,11 @@
                     method="POST"
                     action="{{ url_for('delete_favorite_entry', favorite_id=favorite.id) }}"
                 >
-                    <input type="hidden"
-                           name="csrf_token"
-                           value="{{ csrf_token() }}">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
 
                     <button type="submit" class="delete-button">
                         Remove Favorite
@@ -363,6 +424,7 @@
 
     <section class="hub-panel" data-panel="history" hidden>
         <h2>Food History</h2>
+
         <p class="muted">
             View your nutrition from previous days.
         </p>
@@ -449,9 +511,16 @@
 
 <script>
     const initialTab = {{ active_tab | tojson }};
+
     const tabButtons = document.querySelectorAll(".hub-tab");
     const tabPanels = document.querySelectorAll(".hub-panel");
-    const validTabs = ["search", "manual", "favorites", "history"];
+
+    const validTabs = [
+        "search",
+        "manual",
+        "favorites",
+        "history"
+    ];
 
     function showTab(tabName) {
         const selected = validTabs.includes(tabName)
@@ -490,7 +559,13 @@
     const nextButton = document.getElementById("next-page");
     const pageInformation = document.getElementById("page-information");
 
-    const productUrlTemplate = {{ url_for('select_food', barcode='BARCODE_PLACEHOLDER') | tojson }};
+    const productUrlTemplate = {{
+        url_for('select_food', barcode='BARCODE_PLACEHOLDER') | tojson
+    }};
+
+    const reuseUrlTemplate = {{
+        url_for('reuse_food', entry_id=999999999) | tojson
+    }};
 
     let currentPage = 1;
     let totalPages = 0;
@@ -503,9 +578,11 @@
 
         if (product.image) {
             const image = document.createElement("img");
+
             image.src = product.image;
             image.alt = product.name;
             image.loading = "lazy";
+
             card.appendChild(image);
         }
 
@@ -520,18 +597,35 @@
         brand.textContent = product.brand || "Unknown brand";
 
         const nutrition = document.createElement("p");
+
         nutrition.textContent =
             `${product.calories} kcal | ` +
             `Protein: ${product.protein}g | ` +
             `Carbs: ${product.carbs}g | ` +
             `Fat: ${product.fat}g (per 100g)`;
 
+        if (product.previously_logged) {
+            const badge = document.createElement("span");
+
+            badge.className = "previously-logged";
+            badge.textContent = "Previously Logged";
+
+            details.appendChild(badge);
+        }
+
         const selectLink = document.createElement("a");
 
-        selectLink.href = productUrlTemplate.replace(
-            "BARCODE_PLACEHOLDER",
-            encodeURIComponent(product.barcode)
-        );
+        if (product.history_id) {
+            selectLink.href = reuseUrlTemplate.replace(
+                "999999999",
+                String(product.history_id)
+            );
+        } else {
+            selectLink.href = productUrlTemplate.replace(
+                "BARCODE_PLACEHOLDER",
+                encodeURIComponent(product.barcode)
+            );
+        }
 
         selectLink.className = "action-link";
         selectLink.textContent = "Select Product";
@@ -624,6 +718,7 @@
                 searchButton.disabled = false;
                 previousButton.disabled = currentPage <= 1;
                 nextButton.disabled = currentPage >= totalPages;
+
                 activeController = null;
             }
         }
