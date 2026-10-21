@@ -244,6 +244,29 @@ def search_products_api():
             }
 
         if page == 1:
+            with get_database() as connection:
+                custom_rows = connection.execute(
+                    "SELECT * FROM custom_products WHERE user_id = ?",
+                    (user_id,)
+                ).fetchall()
+            existing_barcodes = {
+                product["barcode"] for product in history_products
+                if product["barcode"]
+            }
+            for saved in custom_rows:
+                if saved["barcode"] in existing_barcodes:
+                    continue
+                if normalized_query not in normalize_text(saved["name"] + " " + saved["brand"]):
+                    continue
+                history_products.append({
+                    "barcode": saved["barcode"],
+                    "name": saved["name"], "brand": saved["brand"],
+                    "image": "", "calories": saved["calories"],
+                    "protein": saved["protein"], "carbs": saved["carbs"],
+                    "fat": saved["fat"], "previously_logged": False
+                })
+                existing_barcodes.add(saved["barcode"])
+
             history_products = sort_products(
                 history_products,
                 query,
@@ -579,6 +602,38 @@ def search_food():
     )
 
 
+def find_saved_product(user_id, barcode):
+    with get_database() as connection:
+        saved = connection.execute(
+            "SELECT * FROM custom_products WHERE user_id = ? AND barcode = ?",
+            (user_id, barcode)
+        ).fetchone()
+        if saved:
+            return {
+                "barcode": barcode, "name": saved["name"],
+                "brand": saved["brand"], "image": "",
+                "calories": saved["calories"], "protein": saved["protein"],
+                "carbs": saved["carbs"], "fat": saved["fat"]
+            }
+
+        entry = connection.execute("""
+            SELECT * FROM food_entries
+            WHERE user_id = ? AND barcode = ? AND amount > 0
+            ORDER BY id DESC LIMIT 1
+        """, (user_id, barcode)).fetchone()
+        if entry:
+            multiplier = 100 / entry["amount"]
+            return {
+                "barcode": barcode, "name": entry["food_name"],
+                "brand": "Previously logged", "image": "",
+                "calories": round(entry["calories"] * multiplier, 1),
+                "protein": round(entry["protein"] * multiplier, 1),
+                "carbs": round(entry["carbs"] * multiplier, 1),
+                "fat": round(entry["fat"] * multiplier, 1)
+            }
+    return None
+
+
 @app.route("/food/select/<barcode>", methods=["GET", "POST"])
 @limiter.limit("60 per minute")
 def select_food(barcode):
@@ -588,85 +643,89 @@ def select_food(barcode):
     if not re.fullmatch(r"[0-9]{8,14}", barcode):
         return "Invalid barcode.", 400
 
-    try:
-        product = get_product(barcode)
-    except (
-        requests.RequestException,
-        ValueError,
-        TypeError
-    ):
-        return "Unable to load product.", 502
+    user_id = session["user_id"]
+    product = find_saved_product(user_id, barcode)
+    api_unavailable = False
 
     if product is None:
-        return "Product not found or nutrition data unavailable.", 404
+        try:
+            product = get_product(barcode)
+        except (requests.RequestException, ValueError, TypeError) as error:
+            app.logger.warning("Product lookup failed for %s: %s", barcode, error)
+            api_unavailable = True
+
+    if product is None:
+        if request.method == "POST":
+            flash("Save this product first, then add it to your tracker.")
+        return render_template(
+            "unknown_product.html", barcode=barcode,
+            api_unavailable=api_unavailable
+        )
 
     if request.method == "POST":
         try:
             amount = float(request.form["amount"])
-
             if not math.isfinite(amount) or not 0 < amount <= 10000:
                 raise ValueError
-
         except (ValueError, KeyError):
             flash("Please enter a valid amount.")
-            return redirect(
-                url_for("select_food", barcode=barcode)
-            )
+            return redirect(url_for("select_food", barcode=barcode))
 
         multiplier = amount / 100
-
-        calories = round(
-            product["calories"] * multiplier,
-            1
-        )
-        protein = round(
-            product["protein"] * multiplier,
-            1
-        )
-        carbs = round(
-            product["carbs"] * multiplier,
-            1
-        )
-        fat = round(
-            product["fat"] * multiplier,
-            1
-        )
-
-        nutrition_values = (
-            calories,
-            protein,
-            carbs,
-            fat
-        )
-
-        if not all(
-            math.isfinite(value) and 0 <= value <= 100000
-            for value in nutrition_values
-        ):
+        values = [
+            round(float(product[field]) * multiplier, 1)
+            for field in ("calories", "protein", "carbs", "fat")
+        ]
+        if not all(math.isfinite(value) and 0 <= value <= 100000 for value in values):
             flash("Invalid nutritional information.")
-            return redirect(
-                url_for("select_food", barcode=barcode)
-            )
+            return redirect(url_for("select_food", barcode=barcode))
 
-        add_food(
-            session["user_id"],
-            product["name"],
-            amount,
-            calories,
-            protein,
-            carbs,
-            fat,
-            barcode=barcode
-        )
-
+        add_food(user_id, product["name"], amount, *values, barcode=barcode)
         flash("Food added successfully.")
         return redirect(url_for("dashboard"))
 
-    return render_template(
-        "select_food.html",
-        product=product
-    )
+    return render_template("select_food.html", product=product)
 
+
+@app.route("/food/product/<barcode>/create", methods=["POST"])
+@limiter.limit("30 per minute")
+def create_custom_product(barcode):
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+    if not re.fullmatch(r"[0-9]{8,14}", barcode):
+        return "Invalid barcode.", 400
+
+    try:
+        name = request.form["name"].strip()
+        brand = request.form.get("brand", "").strip()
+        if not name or len(name) > 150 or len(brand) > 150:
+            raise ValueError
+        values = [
+            float(request.form[field])
+            for field in ("calories", "protein", "carbs", "fat")
+        ]
+        if not all(math.isfinite(value) and 0 <= value <= 100000 for value in values):
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        flash("Please enter a product name and valid nutrition per 100 g.")
+        return redirect(url_for("select_food", barcode=barcode))
+
+    with get_database() as connection:
+        connection.execute("""
+            INSERT INTO custom_products
+                (user_id, barcode, name, brand, calories, protein, carbs, fat)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, barcode) DO UPDATE SET
+                name = excluded.name,
+                brand = excluded.brand,
+                calories = excluded.calories,
+                protein = excluded.protein,
+                carbs = excluded.carbs,
+                fat = excluded.fat
+        """, (session["user_id"], barcode, name, brand, *values))
+
+    flash("Product saved. You can now add it to your tracker.")
+    return redirect(url_for("select_food", barcode=barcode))
 
 @app.route("/history")
 def food_history():
@@ -798,4 +857,4 @@ def scan_food():
 
 
 if __name__ == "__main__":
-    app.run(debug=not is_production)
+    app.run(host="0.0.0.0", port=5000, debug=False)

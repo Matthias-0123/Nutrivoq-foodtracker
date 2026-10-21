@@ -4,32 +4,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Scanner - Nutrivoq Food Tracker</title>
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <title>Barcode Scanner - Nutrivoq</title>
 
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+    <style>
+        .scanner-preview {
+            position: relative;
+            width: 100%;
+            max-width: 650px;
+            margin: 20px auto;
+            overflow: hidden;
+            border-radius: 12px;
+            background: #111;
+        }
+
+        #scanner-video {
+            display: none;
+            width: 100%;
+            max-height: 65vh;
+            object-fit: contain;
+        }
+
+        .scanner-guide {
+            display: none;
+            position: absolute;
+            top: 35%;
+            left: 8%;
+            width: 84%;
+            height: 30%;
+            border: 2px solid #42d392;
+            border-radius: 8px;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+
+        .scanner-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .scanner-actions button {
+            flex: 1 1 140px;
+        }
+
+        #scanner-status {
+            margin-top: 14px;
+            overflow-wrap: anywhere;
+        }
+    </style>
 </head>
+
 <body>
 <main class="container scanner-container">
 
     <h1>Scan Barcode</h1>
-    <p>Scan a product to view its nutritional information.</p>
+    <p>Point your camera at a product barcode.</p>
 
     <section class="nutrition-card">
 
-        <div id="reader"></div>
+        <div class="scanner-preview">
+            <video
+                id="scanner-video"
+                autoplay
+                muted
+                playsinline
+            ></video>
+
+            <div
+                id="scanner-guide"
+                class="scanner-guide"
+            ></div>
+        </div>
 
         <p id="scanner-status" class="muted">
             Camera is not active.
         </p>
 
         <div class="scanner-actions">
+
             <button type="button" id="start-scanner">
                 Start Camera
+            </button>
+
+            <button
+                type="button"
+                id="restart-scanner"
+                class="secondary-button"
+                disabled
+            >
+                Restart Scanner
+            </button>
+
+            <button
+                type="button"
+                id="switch-camera"
+                class="secondary-button"
+                disabled
+            >
+                Switch Camera
             </button>
 
             <button
@@ -40,14 +118,17 @@
             >
                 Stop Camera
             </button>
+
         </div>
 
     </section>
 
     <section class="nutrition-card">
+
         <h2>Enter Barcode Manually</h2>
 
         <form id="barcode-form">
+
             <label for="barcode-input">Product Barcode</label>
 
             <input
@@ -56,14 +137,16 @@
                 inputmode="numeric"
                 pattern="[0-9]{8,14}"
                 maxlength="14"
-                placeholder="e.g. 8718452520671"
+                placeholder="e.g. 3017620422003"
                 required
             >
 
             <button type="submit">
                 Find Product
             </button>
+
         </form>
+
     </section>
 
     <a href="{{ url_for('dashboard') }}">
@@ -73,134 +156,282 @@
 </main>
 
 <script>
-    const scanner = new Html5Qrcode("reader", {
-        formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E
-        ]
-    });
+    const video = document.getElementById("scanner-video");
+    const guide = document.getElementById("scanner-guide");
+    const statusText = document.getElementById("scanner-status");
 
     const startButton = document.getElementById("start-scanner");
+    const restartButton = document.getElementById("restart-scanner");
+    const switchButton = document.getElementById("switch-camera");
     const stopButton = document.getElementById("stop-scanner");
-    const scannerStatus = document.getElementById("scanner-status");
+
     const barcodeForm = document.getElementById("barcode-form");
     const barcodeInput = document.getElementById("barcode-input");
 
-    const productUrlTemplate = {{ url_for('select_food', barcode='BARCODE_PLACEHOLDER') | tojson }};
+    const productUrlTemplate =
+        {{ url_for('select_food', barcode='BARCODE_PLACEHOLDER') | tojson }};
+
+    let reader = null;
+    let devices = [];
+    let selectedCameraIndex = 0;
 
     let isScanning = false;
+    let isStarting = false;
     let barcodeDetected = false;
+    let scannerVersion = 0;
+
+    function setStatus(message) {
+        statusText.textContent = message;
+    }
+
+    function updateButtons() {
+        startButton.disabled = isScanning || isStarting;
+
+        restartButton.disabled = !isScanning && !isStarting;
+        stopButton.disabled = !isScanning && !isStarting;
+
+        switchButton.disabled =
+            devices.length < 2 || (!isScanning && !isStarting);
+    }
+
+    function stopVideoTracks() {
+        const stream = video.srcObject;
+
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+    }
+
+    function stopScanner() {
+        scannerVersion++;
+
+        isScanning = false;
+        isStarting = false;
+
+        if (reader) {
+            reader.reset();
+            reader = null;
+        }
+
+        stopVideoTracks();
+
+        video.style.display = "none";
+        guide.style.display = "none";
+
+        updateButtons();
+    }
 
     function openProduct(barcode) {
-        if (!/^[0-9]{8,14}$/.test(barcode)) {
-            scannerStatus.textContent = "Invalid barcode.";
+        const cleanedBarcode = String(barcode).trim();
+
+        if (!/^[0-9]{8,14}$/.test(cleanedBarcode)) {
+            setStatus("Unsupported product barcode: " + cleanedBarcode);
             return;
         }
 
+        if (barcodeDetected) {
+            return;
+        }
+
+        barcodeDetected = true;
+
+        setStatus("Barcode detected: " + cleanedBarcode);
+
+        if (navigator.vibrate) {
+            navigator.vibrate(100);
+        }
+
+        stopScanner();
+
         const productUrl = productUrlTemplate.replace(
             "BARCODE_PLACEHOLDER",
-            encodeURIComponent(barcode)
+            encodeURIComponent(cleanedBarcode)
         );
 
         window.location.assign(productUrl);
     }
 
+    function createReader() {
+        const hints = new Map();
+
+        hints.set(
+            ZXing.DecodeHintType.POSSIBLE_FORMATS,
+            [
+                ZXing.BarcodeFormat.EAN_13,
+                ZXing.BarcodeFormat.EAN_8,
+                ZXing.BarcodeFormat.UPC_A,
+                ZXing.BarcodeFormat.UPC_E,
+                ZXing.BarcodeFormat.CODE_128,
+                ZXing.BarcodeFormat.CODE_39,
+                ZXing.BarcodeFormat.ITF
+            ]
+        );
+
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+        return new ZXing.BrowserMultiFormatReader(hints, 150);
+    }
+
     async function startScanner() {
-        if (isScanning) {
+        if (isScanning || isStarting) {
             return;
         }
 
         if (!window.isSecureContext) {
-            scannerStatus.textContent =
-                "Camera requires HTTPS or localhost.";
+            setStatus("Camera requires HTTPS or localhost.");
             return;
         }
 
         if (!navigator.mediaDevices?.getUserMedia) {
-            scannerStatus.textContent =
-                "Camera access is not supported in this browser.";
+            setStatus("Camera is not supported in this browser.");
             return;
         }
 
-        startButton.disabled = true;
+        if (typeof ZXing === "undefined") {
+            setStatus("Scanner library failed to load. Check your connection.");
+            return;
+        }
+
+        isStarting = true;
         barcodeDetected = false;
-        scannerStatus.textContent = "Starting camera...";
+
+        const currentVersion = ++scannerVersion;
+
+        video.style.display = "block";
+        guide.style.display = "block";
+
+        setStatus("Starting camera...");
+        updateButtons();
 
         try {
-            await scanner.start(
-                { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 150 }
-                },
-                async (decodedText) => {
-                    if (barcodeDetected) {
+            reader = createReader();
+
+            devices = await reader.listVideoInputDevices();
+
+            if (currentVersion !== scannerVersion) {
+                return;
+            }
+
+            if (devices.length === 0) {
+                throw new Error("No cameras found.");
+            }
+
+            if (selectedCameraIndex >= devices.length) {
+                selectedCameraIndex = 0;
+            }
+
+            const currentDevice = devices[selectedCameraIndex];
+
+            const currentReader = reader;
+
+            isScanning = true;
+            isStarting = false;
+
+            updateButtons();
+
+            setStatus("Scanning... Hold the barcode steady and in focus.");
+
+            await currentReader.decodeFromVideoDevice(
+                currentDevice.deviceId,
+                video,
+                (result, error) => {
+                    if (
+                        currentVersion !== scannerVersion ||
+                        !isScanning ||
+                        barcodeDetected
+                    ) {
                         return;
                     }
 
-                    barcodeDetected = true;
-                    scannerStatus.textContent =
-                        "Barcode detected: " + decodedText;
+                    if (result) {
+                        const barcode = result.getText();
 
-                    try {
-                        await stopScanner();
-                    } finally {
-                        openProduct(decodedText);
+                        if (/^[0-9]{8,14}$/.test(barcode)) {
+                            openProduct(barcode);
+                        } else {
+                            setStatus(
+                                "Detected non-product barcode: " + barcode
+                            );
+                        }
+
+                        return;
                     }
-                },
-                () => {}
+
+                    if (
+                        error &&
+                        !(error instanceof ZXing.NotFoundException) &&
+                        !(error instanceof ZXing.ChecksumException) &&
+                        !(error instanceof ZXing.FormatException)
+                    ) {
+                        console.warn("Scanner error:", error);
+                    }
+                }
             );
 
-            isScanning = true;
-            stopButton.disabled = false;
-            scannerStatus.textContent = "Point your camera at a barcode.";
-
         } catch (error) {
-            startButton.disabled = false;
-            scannerStatus.textContent =
-                "Unable to start camera. Check permissions.";
-            console.error(error);
+            if (currentVersion !== scannerVersion) {
+                return;
+            }
+
+            console.error("Unable to start scanner:", error);
+
+            stopScanner();
+
+            setStatus(
+                "Unable to start scanner: " +
+                (error.message || String(error))
+            );
         }
     }
 
-    async function stopScanner() {
-        if (!isScanning) {
+    async function restartScanner() {
+        stopScanner();
+
+        setStatus("Restarting scanner...");
+
+        await startScanner();
+    }
+
+    async function switchCamera() {
+        if (devices.length < 2) {
+            setStatus("No other camera available.");
             return;
         }
 
-        try {
-            await scanner.stop();
-        } catch (error) {
-            console.error(error);
-        } finally {
-            isScanning = false;
-            startButton.disabled = false;
-            stopButton.disabled = true;
-        }
+        selectedCameraIndex =
+            (selectedCameraIndex + 1) % devices.length;
+
+        await restartScanner();
     }
 
     startButton.addEventListener("click", startScanner);
 
-    stopButton.addEventListener("click", async () => {
-        await stopScanner();
-        scannerStatus.textContent = "Camera stopped.";
+    restartButton.addEventListener("click", restartScanner);
+
+    switchButton.addEventListener("click", switchCamera);
+
+    stopButton.addEventListener("click", () => {
+        stopScanner();
+        setStatus("Camera stopped.");
     });
 
-    barcodeForm.addEventListener("submit", async (event) => {
+    barcodeForm.addEventListener("submit", event => {
         event.preventDefault();
 
         const barcode = barcodeInput.value.trim();
 
         if (!/^[0-9]{8,14}$/.test(barcode)) {
-            scannerStatus.textContent = "Invalid barcode.";
+            setStatus("Enter a valid product barcode.");
             return;
         }
 
-        await stopScanner();
+        barcodeDetected = false;
         openProduct(barcode);
     });
+
+    window.addEventListener("pagehide", stopScanner);
 </script>
+
 </body>
 </html>

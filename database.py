@@ -158,3 +158,19 @@ def initialize_database():
                     ON DELETE CASCADE
             )
         """)
+
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS custom_products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                barcode TEXT NOT NULL,
+                name TEXT NOT NULL,
+                brand TEXT NOT NULL DEFAULT '',
+                calories REAL NOT NULL,
+                protein REAL NOT NULL,
+                carbs REAL NOT NULL,
+                fat REAL NOT NULL,
+                UNIQUE(user_id, barcode),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)

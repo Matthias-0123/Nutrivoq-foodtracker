@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Unknown Product - Nutrivoq</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container">
+    <h1>Product Not Found</h1>
+
+    <p>Barcode: <strong>{{ barcode }}</strong></p>
+
+    {% if api_unavailable %}
+        <p class="message">
+            The product database is temporarily unavailable.
+            You can still save this product yourself.
+        </p>
+    {% else %}
+        <p>
+            This product is not available with complete nutrition
+            information. Enter the values from its packaging to
+            save it for future scans.
+        </p>
+    {% endif %}
+
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
+
+    <section class="nutrition-card">
+        <h2>Add Product</h2>
+
+        <form method="POST" action="{{ url_for('create_custom_product', barcode=barcode) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label for="name">Product Name</label>
+            <input
+                id="name"
+                name="name"
+                type="text"
+                maxlength="150"
+                required
+            >
+
+            <label for="brand">Brand (optional)</label>
+            <input
+                id="brand"
+                name="brand"
+                type="text"
+                maxlength="150"
+            >
+
+            <h3>Nutrition per 100 g / 100 ml</h3>
+
+            <label for="calories">Calories (kcal)</label>
+            <input
+                id="calories"
+                name="calories"
+                type="number"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
+
+            <label for="protein">Protein (g)</label>
+            <input
+                id="protein"
+                name="protein"
+                type="number"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
+
+            <label for="carbs">Carbs (g)</label>
+            <input
+                id="carbs"
+                name="carbs"
+                type="number"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
+
+            <label for="fat">Fat (g)</label>
+            <input
+                id="fat"
+                name="fat"
+                type="number"
+                min="0"
+                max="100000"
+                step="0.1"
+                required
+            >
+
+            <button type="submit">Save Product</button>
+        </form>
+    </section>
+
+    <p>
+        <a href="{{ url_for('scan_food') }}">
+            Back to Scanner
+        </a>
+    </p>
+</main>
+</body>
+</html>
