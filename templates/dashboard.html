@@ -14,11 +14,18 @@
         <div>
             <h1>Nutrivoq</h1>
             <p>Daily Overview — {{ session.get('username', 'User') }}</p>
-            <p><a href="{{ url_for('auth.change_username') }}">Change Username</a></p>
+            <p>
+                <a href="{{ url_for('auth.change_username') }}">
+                    Change Username
+                </a>
+            </p>
         </div>
 
         <form action="{{ url_for('auth.logout') }}" method="POST">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
             <button type="submit" class="secondary-button">
                 Log Out
             </button>
@@ -108,10 +115,12 @@
                         </div>
 
                         <h3>{{ macro.name }}</h3>
+
                         <p class="muted">
                             {{ macro.used }} / {{ macro.goal }} g
                         </p>
                     </div>
+
                 {% endfor %}
             </div>
         </section>
@@ -120,6 +129,7 @@
 
         <section class="nutrition-card">
             <h2>Set Your Nutrition Goals</h2>
+
             <p>
                 Calculate your daily calorie and macronutrient targets.
             </p>
@@ -135,32 +145,12 @@
 
         <a class="action-link"
            href="{{ url_for('search_food') }}">
-            Search All Foods
-        </a>
-
-        <a class="action-link secondary-link"
-           href="{{ url_for('add_food_page') }}">
-            Add Food Manually
-        </a>
-
-        <a class="action-link secondary-link"
-           href="{{ url_for('favorites_page') }}">
-            My Favorites
-        </a>
-
-        <a class="action-link secondary-link"
-           href="{{ url_for('food_history') }}">
-            Food History
+            Food Hub
         </a>
 
         <a class="action-link secondary-link"
            href="{{ url_for('setup') }}">
             Update Goals
-        </a>
-
-        <a class="action-link"
-           href="{{ url_for('scan_food') }}">
-            Scan Barcode
         </a>
 
         <a class="action-link"
@@ -195,6 +185,7 @@
 
                     <form method="POST"
                           action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}">
+
                         <input type="hidden"
                                name="csrf_token"
                                value="{{ csrf_token() }}">
@@ -206,6 +197,7 @@
 
                     <form method="POST"
                           action="{{ url_for('delete_food_entry', entry_id=entry.id) }}">
+
                         <input type="hidden"
                                name="csrf_token"
                                value="{{ csrf_token() }}">

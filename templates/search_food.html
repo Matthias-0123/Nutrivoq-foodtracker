@@ -4,20 +4,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Food - Nutrivoq</title>
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <title>Food Hub - Nutrivoq</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
     <style>
-        .search-form {
-            display: flex;
+        .food-hub-navigation {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
             margin: 24px 0;
         }
 
-        .search-form input {
+        .food-hub-navigation .hub-tab {
+            cursor: pointer;
+            font: inherit;
+            background: #1e293b;
+            border: 1px solid #374151;
+            border-radius: 10px;
+            padding: 15px 10px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .food-hub-navigation .hub-tab.active {
+            background: #14532d;
+            border-color: #22c55e;
+        }
+
+        .hub-panel[hidden] {
+            display: none !important;
+        }
+
+        @media (max-width: 450px) {
+            .food-hub-navigation {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .search-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .search-input-row {
+            display: flex;
+            align-items: stretch;
+            gap: 12px;
+        }
+
+        .search-input-row input {
             flex: 1;
             min-width: 0;
+            margin: 0;
+        }
+
+        .scan-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 54px;
+            min-width: 54px;
+            padding: 0;
+            border-radius: 10px;
+            border: 1px solid #374151;
+            background: #1e293b;
+            color: #ffffff;
+            text-decoration: none;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .scan-button:hover {
+            background: #334155;
+        }
+
+        .scan-button svg {
+            width: 25px;
+            height: 25px;
         }
 
         .product-card {
@@ -69,8 +137,13 @@
                 align-items: flex-start;
             }
 
-            .search-form {
-                flex-direction: column;
+            .search-input-row {
+                gap: 8px;
+            }
+
+            .scan-button {
+                width: 48px;
+                min-width: 48px;
             }
         }
     </style>
@@ -80,44 +153,293 @@
 <main class="container">
 
     <h1>Nutrivoq</h1>
-    <h2>Search Food</h2>
+    <h2>Food Hub</h2>
 
-    <p class="muted">
-        Search food products from all available brands.
-    </p>
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
 
-    <form id="search-form" class="search-form">
-        <input
-            type="search"
-            id="product-search"
-            placeholder="Search milk, rice, chicken..."
-            minlength="3"
-            maxlength="100"
-            required
-        >
-
-        <button type="submit" id="search-button">
-            Search
-        </button>
-    </form>
-
-    <p id="search-status" class="muted">
-        Enter a food name to start searching.
-    </p>
-
-    <div id="product-results"></div>
-
-    <div id="pagination" class="pagination" hidden>
-        <button type="button" id="previous-page">
-            Previous
+    <nav class="food-hub-navigation" aria-label="Food Hub Navigation">
+        <button type="button" class="hub-tab" data-tab="search">
+            Search Food
         </button>
 
-        <span id="page-information"></span>
-
-        <button type="button" id="next-page">
-            Next
+        <button type="button" class="hub-tab" data-tab="manual">
+            Add Manually
         </button>
-    </div>
+
+        <button type="button" class="hub-tab" data-tab="favorites">
+            My Favorites
+        </button>
+
+        <button type="button" class="hub-tab" data-tab="history">
+            Food History
+        </button>
+    </nav>
+
+    <section class="hub-panel" data-panel="search">
+        <p class="muted">
+            Search food products from all available brands.
+        </p>
+
+        <form id="search-form" class="search-form" aria-label="Search Food">
+            <div class="search-input-row">
+                <input
+                    type="search"
+                    id="product-search"
+                    placeholder="Search milk, rice, chicken..."
+                    minlength="3"
+                    maxlength="100"
+                    required
+                >
+
+                <a
+                    href="{{ url_for('scan_food') }}"
+                    class="scan-button"
+                    aria-label="Scan Barcode"
+                    title="Scan Barcode"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M4 7V4h3"/>
+                        <path d="M17 4h3v3"/>
+                        <path d="M20 17v3h-3"/>
+                        <path d="M7 20H4v-3"/>
+                        <path d="M4 12h16"/>
+                        <path d="M8 9v6"/>
+                        <path d="M12 9v6"/>
+                        <path d="M16 9v6"/>
+                    </svg>
+                </a>
+            </div>
+
+            <button type="submit" id="search-button">
+                Search
+            </button>
+        </form>
+
+        <p id="search-status" class="muted">
+            Enter a food name or scan a barcode.
+        </p>
+
+        <div id="product-results"></div>
+
+        <div id="pagination" class="pagination" hidden>
+            <button type="button" id="previous-page">
+                Previous
+            </button>
+
+            <span id="page-information"></span>
+
+            <button type="button" id="next-page">
+                Next
+            </button>
+        </div>
+    </section>
+
+    <section class="hub-panel" data-panel="manual" hidden>
+        <h2>Add Food Manually</h2>
+        <p class="muted">Log your daily nutrition.</p>
+
+        <form method="POST" action="{{ url_for('add_food_page') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <label for="food_name">Food Name</label>
+            <input type="text" id="food_name" name="food_name"
+                   maxlength="100" required>
+
+            <label for="amount">Amount (g)</label>
+            <input type="number" id="amount" name="amount"
+                   min="0.1" max="10000" step="0.1" required>
+
+            <label for="calories">Calories (kcal)</label>
+            <input type="number" id="calories" name="calories"
+                   min="0" max="100000" step="0.1" required>
+
+            <label for="protein">Protein (g)</label>
+            <input type="number" id="protein" name="protein"
+                   min="0" max="100000" step="0.1" required>
+
+            <label for="carbs">Carbohydrates (g)</label>
+            <input type="number" id="carbs" name="carbs"
+                   min="0" max="100000" step="0.1" required>
+
+            <label for="fat">Fat (g)</label>
+            <input type="number" id="fat" name="fat"
+                   min="0" max="100000" step="0.1" required>
+
+            <button type="submit">Add Food</button>
+        </form>
+    </section>
+
+    <section class="hub-panel" data-panel="favorites" hidden>
+        <h2>My Favorites</h2>
+        <p class="muted">
+            Quickly add your favorite foods to today's tracker.
+        </p>
+
+        {% for favorite in favorites %}
+            <section class="nutrition-card">
+                <h3>{{ favorite.food_name }}</h3>
+
+                <p class="muted">
+                    Saved amount: {{ favorite.amount }} g
+                </p>
+
+                <div class="macro">
+                    <span>Calories</span>
+                    <strong>{{ favorite.calories }} kcal</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Protein</span>
+                    <strong>{{ favorite.protein }} g</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Carbs</span>
+                    <strong>{{ favorite.carbs }} g</strong>
+                </div>
+
+                <div class="macro">
+                    <span>Fat</span>
+                    <strong>{{ favorite.fat }} g</strong>
+                </div>
+
+                <form
+                    method="POST"
+                    action="{{ url_for('add_favorite_entry', favorite_id=favorite.id) }}"
+                >
+                    <input type="hidden"
+                           name="csrf_token"
+                           value="{{ csrf_token() }}">
+
+                    <label for="favorite-amount-{{ favorite.id }}">
+                        Amount (g)
+                    </label>
+
+                    <input
+                        type="number"
+                        id="favorite-amount-{{ favorite.id }}"
+                        name="amount"
+                        value="{{ favorite.amount }}"
+                        min="0.1"
+                        max="10000"
+                        step="0.1"
+                        required
+                    >
+
+                    <button type="submit">Add to Today</button>
+                </form>
+
+                <form
+                    method="POST"
+                    action="{{ url_for('delete_favorite_entry', favorite_id=favorite.id) }}"
+                >
+                    <input type="hidden"
+                           name="csrf_token"
+                           value="{{ csrf_token() }}">
+
+                    <button type="submit" class="delete-button">
+                        Remove Favorite
+                    </button>
+                </form>
+            </section>
+        {% else %}
+            <section class="nutrition-card">
+                <p>No favorites saved yet.</p>
+                <p>Save foods from your dashboard to see them here.</p>
+            </section>
+        {% endfor %}
+    </section>
+
+    <section class="hub-panel" data-panel="history" hidden>
+        <h2>Food History</h2>
+        <p class="muted">
+            View your nutrition from previous days.
+        </p>
+
+        <form method="GET" action="{{ url_for('search_food') }}">
+            <input type="hidden" name="tab" value="history">
+
+            <label for="history-date">Select Date</label>
+
+            <input
+                type="date"
+                id="history-date"
+                name="date"
+                value="{{ selected_date }}"
+                required
+            >
+
+            <button type="submit">View History</button>
+        </form>
+
+        <section class="nutrition-card">
+            <h3>Daily Summary</h3>
+
+            <div class="macro">
+                <span>Calories</span>
+                <strong>{{ history_totals.calories }} kcal</strong>
+            </div>
+
+            <div class="macro">
+                <span>Protein</span>
+                <strong>{{ history_totals.protein }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Carbs</span>
+                <strong>{{ history_totals.carbs }} g</strong>
+            </div>
+
+            <div class="macro">
+                <span>Fat</span>
+                <strong>{{ history_totals.fat }} g</strong>
+            </div>
+
+            {% if history_goals %}
+                <p class="muted">
+                    Daily calorie goal: {{ history_goals.calories }} kcal
+                </p>
+            {% endif %}
+        </section>
+
+        <section class="nutrition-card">
+            <h3>Food Entries</h3>
+
+            {% for entry in history_entries %}
+                <div class="food-entry">
+                    <div>
+                        <strong>{{ entry.food_name }}</strong>
+
+                        <p>
+                            {{ entry.amount }} g —
+                            {{ entry.calories }} kcal
+                        </p>
+
+                        <small>
+                            Protein: {{ entry.protein }} g |
+                            Carbs: {{ entry.carbs }} g |
+                            Fat: {{ entry.fat }} g
+                        </small>
+                    </div>
+                </div>
+            {% else %}
+                <p class="muted">
+                    No food entries found for this date.
+                </p>
+            {% endfor %}
+        </section>
+    </section>
 
     <a href="{{ url_for('dashboard') }}">
         Back to Dashboard
@@ -126,6 +448,36 @@
 </main>
 
 <script>
+    const initialTab = {{ active_tab | tojson }};
+    const tabButtons = document.querySelectorAll(".hub-tab");
+    const tabPanels = document.querySelectorAll(".hub-panel");
+    const validTabs = ["search", "manual", "favorites", "history"];
+
+    function showTab(tabName) {
+        const selected = validTabs.includes(tabName)
+            ? tabName
+            : "search";
+
+        tabButtons.forEach(button => {
+            const isActive = button.dataset.tab === selected;
+
+            button.classList.toggle("active", isActive);
+            button.setAttribute("aria-selected", String(isActive));
+        });
+
+        tabPanels.forEach(panel => {
+            panel.hidden = panel.dataset.panel !== selected;
+        });
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            showTab(button.dataset.tab);
+        });
+    });
+
+    showTab(initialTab);
+
     const searchForm = document.getElementById("search-form");
     const searchInput = document.getElementById("product-search");
     const searchButton = document.getElementById("search-button");
@@ -184,13 +536,7 @@
         selectLink.className = "action-link";
         selectLink.textContent = "Select Product";
 
-        details.append(
-            name,
-            brand,
-            nutrition,
-            selectLink
-        );
-
+        details.append(name, brand, nutrition, selectLink);
         card.appendChild(details);
 
         return card;
@@ -246,7 +592,7 @@
 
             const response = await fetch(
                 `/api/products/search?${parameters}`,
-                {signal: controller.signal}
+                { signal: controller.signal }
             );
 
             const data = await response.json();

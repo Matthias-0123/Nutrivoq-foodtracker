@@ -24,15 +24,16 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-PAGE_SIZE = 50
+PAGE_SIZE = 20
 SEARCH_LIMIT = 50
+MAXIMUM_API_PAGES = 10
 
 CACHE_DURATION = 3600
 CACHE_LIMIT = 200
 
 PRODUCT_FIELDS = (
-    "code,product_name,brands,nutriments,"
-    "image_front_small_url"
+    "code,product_name,product_name_en,brands,"
+    "nutriments,image_front_small_url"
 )
 
 logger = logging.getLogger(__name__)
@@ -45,8 +46,9 @@ session = requests.Session()
 retry_strategy = Retry(
     total=1,
     connect=1,
-    read=1,
-    backoff_factor=1,
+    read=0,
+    status=1,
+    backoff_factor=0.5,
     status_forcelist=[500, 502, 503, 504],
     allowed_methods=["GET"],
     respect_retry_after_header=True
@@ -114,7 +116,10 @@ def format_product(product):
         product.get("code") or product.get("_id") or ""
     )
 
-    if not name.strip() or not barcode.isdigit():
+    if not name.strip():
+        return None
+
+    if not barcode.isdigit():
         return None
 
     nutrient_names = (
@@ -262,7 +267,7 @@ def fetch_json(url, parameters=None):
         url,
         params=parameters,
         headers=HEADERS,
-        timeout=(5, 15)
+        timeout=(5, 12)
     )
 
     response.raise_for_status()
@@ -287,44 +292,95 @@ def fetch_search_page(query, page):
     )
 
 
-def get_ranked_products(search_query):
+def create_search_state():
+    return {
+        "products": [],
+        "next_api_page": 1,
+        "has_more": True,
+        "failed": False
+    }
+
+
+def get_ranked_products(search_query, minimum_results=20):
     query = search_query.strip()
     cache_key = ("ranked_search", query.casefold())
 
     cached = get_cached(cache_key)
 
     if cached is not None:
-        return cached
+        state = {
+            "products": cached["products"].copy(),
+            "next_api_page": cached["next_api_page"],
+            "has_more": cached["has_more"],
+            "failed": False
+        }
+    else:
+        state = create_search_state()
 
-    products = []
-    seen_barcodes = set()
+    products = state["products"]
 
-    # One request per search keeps API usage lower.
-    data = fetch_search_page(query, 1)
+    seen_barcodes = {
+        product["barcode"]
+        for product in products
+    }
 
-    if not isinstance(data.get("products"), list):
-        raise ValueError("Unexpected search response")
+    while (
+        len(products) < minimum_results
+        and state["has_more"]
+        and state["next_api_page"] <= MAXIMUM_API_PAGES
+    ):
+        api_page = state["next_api_page"]
 
-    for raw_product in data["products"]:
-        product = format_product(raw_product)
+        try:
+            data = fetch_search_page(query, api_page)
 
-        if product is None:
-            continue
+            raw_products = data.get("products")
 
-        if product["barcode"] in seen_barcodes:
-            continue
+            if not isinstance(raw_products, list):
+                raise ValueError("Unexpected search response")
 
-        seen_barcodes.add(product["barcode"])
-        products.append(product)
+        except (requests.RequestException, ValueError) as error:
+            logger.warning(
+                "Open Food Facts search page %s failed: %s",
+                api_page,
+                error
+            )
 
-    ranked_products = sort_products(
-        products,
-        query
-    )
+            state["failed"] = True
 
-    save_cached(cache_key, ranked_products)
+            if not products:
+                raise
 
-    return ranked_products
+            break
+
+        for raw_product in raw_products:
+            product = format_product(raw_product)
+
+            if product is None:
+                continue
+
+            if product["barcode"] in seen_barcodes:
+                continue
+
+            seen_barcodes.add(product["barcode"])
+            products.append(product)
+
+        state["has_more"] = len(raw_products) >= SEARCH_LIMIT
+        state["next_api_page"] += 1
+
+    if state["next_api_page"] > MAXIMUM_API_PAGES:
+        state["has_more"] = False
+
+    state["products"] = sort_products(products, query)
+
+    if not state["failed"]:
+        save_cached(cache_key, {
+            "products": state["products"],
+            "next_api_page": state["next_api_page"],
+            "has_more": state["has_more"]
+        })
+
+    return state
 
 
 def search_products(search_query, page=1):
@@ -339,15 +395,29 @@ def search_products(search_query, page=1):
             "total_results": 0
         }
 
-    products = get_ranked_products(query)
+    minimum_results = page * PAGE_SIZE
+
+    state = get_ranked_products(
+        query,
+        minimum_results
+    )
+
+    products = state["products"]
+
+    start_index = (page - 1) * PAGE_SIZE
+    end_index = start_index + PAGE_SIZE
 
     total_results = len(products)
+
     total_pages = math.ceil(
         total_results / PAGE_SIZE
     )
 
-    start_index = (page - 1) * PAGE_SIZE
-    end_index = start_index + PAGE_SIZE
+    if state["has_more"] and not state["failed"]:
+        total_pages = max(
+            total_pages,
+            page + 1
+        )
 
     return {
         "products": products[start_index:end_index],

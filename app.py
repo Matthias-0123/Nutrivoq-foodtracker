@@ -1,4 +1,3 @@
-
 import math
 import os
 import re
@@ -289,7 +288,7 @@ def add_food_page():
 
         except (ValueError, KeyError):
             flash("Please enter valid food information.")
-            return redirect(url_for("add_food_page"))
+            return redirect(url_for("search_food", tab="manual"))
 
         add_food(
             session["user_id"],
@@ -301,7 +300,7 @@ def add_food_page():
             fat
         )
 
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("search_food", tab="manual"))
 
     return render_template("add_food.html")
 
@@ -321,7 +320,32 @@ def search_food():
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    return render_template("search_food.html")
+    user_id = session["user_id"]
+    selected_date = request.args.get("date", date.today().isoformat())
+
+    try:
+        datetime.strptime(selected_date, "%Y-%m-%d")
+    except ValueError:
+        selected_date = date.today().isoformat()
+
+    history_entries = get_daily_food(user_id, selected_date)
+    history_totals = calculate_daily_totals(history_entries)
+
+    with get_database() as connection:
+        goals = connection.execute(
+            "SELECT * FROM user_goals WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+
+    return render_template(
+        "search_food.html",
+        favorites=get_favorites(user_id),
+        history_entries=history_entries,
+        history_totals=history_totals,
+        history_goals=goals,
+        selected_date=selected_date,
+        active_tab=request.args.get("tab", "search")
+    )
 
 
 @app.route("/food/select/<barcode>", methods=["GET", "POST"])
@@ -471,7 +495,7 @@ def add_favorite_entry(favorite_id):
 
     except (ValueError, KeyError):
         flash("Please enter a valid amount.")
-        return redirect(url_for("favorites_page"))
+        return redirect(url_for("search_food", tab="favorites"))
 
     added = add_favorite_to_daily_tracker(
         session["user_id"],
@@ -481,10 +505,10 @@ def add_favorite_entry(favorite_id):
 
     if added:
         flash("Favorite added to today's food.")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("search_food", tab="favorites"))
 
     flash("Favorite not found.")
-    return redirect(url_for("favorites_page"))
+    return redirect(url_for("search_food", tab="favorites"))
 
 
 @app.route("/favorites/delete/<int:favorite_id>", methods=["POST"])
@@ -495,7 +519,7 @@ def delete_favorite_entry(favorite_id):
     delete_favorite(session["user_id"], favorite_id)
 
     flash("Favorite removed.")
-    return redirect(url_for("favorites_page"))
+    return redirect(url_for("search_food", tab="favorites"))
 
 
 @app.route("/food/scan")
