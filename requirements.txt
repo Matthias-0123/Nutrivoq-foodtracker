@@ -3,3 +3,4 @@ python-dotenv
 requests
 Flask-WTF
 Flask-Limiter
+Pillow
