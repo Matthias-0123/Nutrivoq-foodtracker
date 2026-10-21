@@ -1,0 +1,214 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Progress Tracker</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
+            defer></script>
+</head>
+
+<body>
+<main class="container dashboard-container">
+
+    <header class="dashboard-header">
+        <div>
+            <h1>Progress Tracker</h1>
+            <p>Track your weight and progress photos</p>
+        </div>
+
+        <a class="secondary-button"
+           href="{{ url_for('dashboard') }}">
+            Back to Dashboard
+        </a>
+    </header>
+
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
+
+    <section class="nutrition-card">
+        <h2>Add progress entry</h2>
+
+        <form method="POST"
+              enctype="multipart/form-data"
+              class="progress-form">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ csrf_token() }}">
+
+            <label>
+                Weight (kg)
+                <input type="number"
+                       name="weight"
+                       min="0.1"
+                       max="700"
+                       step="0.1"
+                       required>
+            </label>
+
+            <label>
+                Photo taken at
+                <input type="datetime-local"
+                       name="taken_at"
+                       max="{{ now }}"
+                       value="{{ now }}"
+                       required>
+            </label>
+
+            <label>
+                Progress photo
+                <input type="file"
+                       name="photo"
+                       accept="image/jpeg,image/png,image/webp"
+                       required>
+            </label>
+
+            <button type="submit">Save progress</button>
+        </form>
+    </section>
+
+    <section class="nutrition-card">
+        <h2>Weight over time</h2>
+        <p>Click a point to view its progress photo below.</p>
+
+        {% if entries %}
+
+            <div class="progress-chart">
+                <canvas id="weightChart"></canvas>
+            </div>
+
+            <div id="selectedEntry"
+                 class="selected-entry"
+                 hidden>
+
+                <h3 id="entryDetails"></h3>
+
+                <img id="entryPhoto"
+                     alt="Selected progress photo">
+
+                <form id="deleteEntry" method="POST">
+                    <input type="hidden"
+                           name="csrf_token"
+                           value="{{ csrf_token() }}">
+
+                    <button type="submit"
+                            class="secondary-button"
+                            onclick="return confirm('Delete this progress entry?')">
+                        Delete entry
+                    </button>
+                </form>
+            </div>
+
+        {% else %}
+            <p>No progress entries yet. Add your first photo above!</p>
+        {% endif %}
+    </section>
+</main>
+
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+    const entries = {{ entries | tojson }};
+
+    if (!entries.length) {
+        return;
+    }
+
+    const chartCanvas = document.getElementById("weightChart");
+
+    const chart = new Chart(chartCanvas, {
+        type: "line",
+
+        data: {
+            labels: entries.map(entry =>
+                new Date(entry.taken_at).toLocaleDateString()
+            ),
+
+            datasets: [{
+                label: "Weight (kg)",
+                data: entries.map(entry => entry.weight),
+                borderColor: "#22c55e",
+                backgroundColor: "#22c55e",
+                pointRadius: 6,
+                pointHoverRadius: 10,
+                hitRadius: 12,
+                tension: 0.25
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            interaction: {
+                mode: "nearest",
+                intersect: true
+            },
+
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: "Weight (kg)"
+                    }
+                },
+
+                x: {
+                    title: {
+                        display: true,
+                        text: "Date"
+                    }
+                }
+            },
+
+            onClick: (event, points) => {
+                if (points.length) {
+                    selectEntry(points[0].index);
+                }
+            }
+        }
+    });
+
+    function selectEntry(index) {
+        const entry = entries[index];
+
+        const selectedEntry = document.getElementById("selectedEntry");
+        const entryDetails = document.getElementById("entryDetails");
+        const entryPhoto = document.getElementById("entryPhoto");
+        const deleteEntry = document.getElementById("deleteEntry");
+
+        selectedEntry.hidden = false;
+
+        entryDetails.textContent =
+            `${entry.weight} kg — ${new Date(entry.taken_at).toLocaleString()}`;
+
+        entryPhoto.src = `/progress/photo/${entry.id}`;
+
+        deleteEntry.action = `/progress/delete/${entry.id}`;
+
+        chart.data.datasets[0].pointBackgroundColor =
+            entries.map((item, pointIndex) =>
+                pointIndex === index ? "#f59e0b" : "#22c55e"
+            );
+
+        chart.update();
+    }
+
+    selectEntry(entries.length - 1);
+});
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import os
 import re
 import requests
 
+from progress import progress
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 
@@ -59,6 +60,7 @@ csrf = CSRFProtect(app)
 limiter.init_app(app)
 
 app.register_blueprint(auth)
+app.register_blueprint(progress)
 
 initialize_database()
 
