@@ -11,25 +11,28 @@
 <main class="container dashboard-container">
 
     <header class="dashboard-header">
-        <div>
+        <div class="dashboard-brand">
             <h1>Nutrivoq</h1>
-            <p>Daily Overview — {{ session.get('username', 'User') }}</p>
-            <p>
-                <a href="{{ url_for('auth.change_username') }}">
-                    Change Username
-                </a>
-            </p>
+            <p>Welcome back, {{ session.get('username', 'User') }}</p>
         </div>
 
-        <form action="{{ url_for('auth.logout') }}" method="POST">
-            <input type="hidden"
-                   name="csrf_token"
-                   value="{{ csrf_token() }}">
+        <div class="dashboard-account">
+            <a href="{{ url_for('auth.change_username') }}">
+                Change Username
+            </a>
 
-            <button type="submit" class="secondary-button">
-                Log Out
-            </button>
-        </form>
+            <form action="{{ url_for('auth.logout') }}" method="POST">
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token() }}"
+                >
+
+                <button type="submit" class="secondary-button">
+                    Log Out
+                </button>
+            </form>
+        </div>
     </header>
 
     {% for message in get_flashed_messages() %}
@@ -42,55 +45,97 @@
             (totals.calories / goals.calories * 100)
             if goals.calories > 0 else 0 %}
 
-        <section class="nutrition-card">
-            <h2>Calories</h2>
+        {% set progress_percentage =
+            [[calorie_percentage, 0] | max, 100] | min %}
+
+        <section class="nutrition-card calorie-card">
+
+            <div class="card-heading">
+                <div>
+                    <p class="section-eyebrow">DAILY OVERVIEW</p>
+                    <h2>Calories</h2>
+                </div>
+
+                {% if goals['goal'] == 'gain' %}
+                    <span class="goal-badge">Weight Gain</span>
+                {% elif goals['goal'] == 'lose' %}
+                    <span class="goal-badge">Weight Loss</span>
+                {% else %}
+                    <span class="goal-badge">Maintenance</span>
+                {% endif %}
+            </div>
 
             <div class="calorie-summary">
                 <div>
                     <span class="muted">Consumed</span>
-                    <h2>{{ totals.calories }} kcal</h2>
+
+                    <div class="calorie-value">
+                        {{ totals.calories | round | int }}
+                        <span>kcal</span>
+                    </div>
                 </div>
 
-                <div>
-                    <span class="muted">Remaining</span>
-                    <h2>{{ remaining.calories }} kcal</h2>
+                <div class="calorie-goal">
+                    <span class="muted">Daily Goal</span>
+
+                    <div class="calorie-target">
+                        {{ goals.calories }} kcal
+                    </div>
                 </div>
             </div>
 
             <div class="progress-track">
-                <div class="progress-fill"
-                     style="width: {{ [[calorie_percentage, 0] | max, 100] | min }}%">
+                <div
+                    class="progress-fill"
+                    style="width: {{ progress_percentage }}%">
                 </div>
             </div>
 
-            <p class="muted">
-                {{ calorie_percentage | round | int }}%
-                of {{ goals.calories }} kcal goal
-            </p>
+            <div class="calorie-footer">
+                <span>
+                    {{ calorie_percentage | round | int }}% completed
+                </span>
+
+                <span>
+                    {% if remaining.calories >= 0 %}
+                        {{ remaining.calories | round | int }} kcal remaining
+                    {% else %}
+                        {{ (remaining.calories * -1) | round | int }} kcal over goal
+                    {% endif %}
+                </span>
+            </div>
+
         </section>
 
         <section class="nutrition-card">
-            <h2>Macronutrients</h2>
+
+            <div class="card-heading">
+                <div>
+                    <p class="section-eyebrow">DAILY TARGETS</p>
+                    <h2>Macronutrients</h2>
+                </div>
+            </div>
 
             <div class="macro-grid">
+
                 {% for macro in [
                     {
                         "name": "Protein",
                         "used": totals.protein,
                         "goal": goals.protein,
-                        "color": "#38bdf8"
+                        "color": "#4ade80"
                     },
                     {
                         "name": "Carbs",
                         "used": totals.carbs,
                         "goal": goals.carbs,
-                        "color": "#f59e0b"
+                        "color": "#60a5fa"
                     },
                     {
                         "name": "Fat",
                         "used": totals.fat,
                         "goal": goals.fat,
-                        "color": "#a78bfa"
+                        "color": "#fbbf24"
                     }
                 ] %}
 
@@ -102,27 +147,35 @@
                         [[percentage, 0] | max, 100] | min %}
 
                     <div class="macro-item">
-                        <div class="progress-circle"
-                             style="
+
+                        <div
+                            class="progress-circle"
+                            style="
                                 --progress: {{ circle_percentage }}%;
                                 --circle-color: {{ macro.color }};
-                             ">
+                            ">
+
                             <div class="circle-inner">
                                 <strong>
                                     {{ percentage | round | int }}%
                                 </strong>
                             </div>
+
                         </div>
 
                         <h3>{{ macro.name }}</h3>
 
-                        <p class="muted">
-                            {{ macro.used }} / {{ macro.goal }} g
+                        <p class="macro-amount">
+                            <strong>{{ macro.used | round | int }}</strong>
+                            <span>/ {{ macro.goal }} g</span>
                         </p>
+
                     </div>
 
                 {% endfor %}
+
             </div>
+
         </section>
 
     {% else %}
@@ -130,7 +183,7 @@
         <section class="nutrition-card">
             <h2>Set Your Nutrition Goals</h2>
 
-            <p>
+            <p class="muted">
                 Calculate your daily calorie and macronutrient targets.
             </p>
 
@@ -141,31 +194,35 @@
 
     {% endif %}
 
-    <div class="dashboard-actions">
+    <nav class="dashboard-actions" aria-label="Dashboard navigation">
 
-        <a class="action-link"
-           href="{{ url_for('search_food') }}">
-            Food Hub
+        <a class="action-link" href="{{ url_for('search_food') }}">
+            <span>Food Hub</span>
         </a>
 
-        <a class="action-link secondary-link"
-           href="{{ url_for('setup') }}">
-            Update Goals
+        <a class="action-link" href="{{ url_for('setup') }}">
+            <span>Update Goals</span>
         </a>
 
-        <a class="action-link"
-           href="{{ url_for('progress.tracker') }}">
-            Progress Tracker
+        <a class="action-link" href="{{ url_for('progress.tracker') }}">
+            <span>Progress Tracker</span>
         </a>
 
-    </div>
+    </nav>
 
     <section class="nutrition-card">
-        <h2>Today's Food</h2>
+
+        <div class="card-heading">
+            <div>
+                <p class="section-eyebrow">FOOD DIARY</p>
+                <h2>Today's Food</h2>
+            </div>
+        </div>
 
         {% for entry in entries %}
 
             <div class="food-entry">
+
                 <div class="food-entry-details">
                     <strong>{{ entry.food_name }}</strong>
 
@@ -183,24 +240,30 @@
 
                 <div class="food-entry-actions">
 
-                    <form method="POST"
-                          action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}">
+                    <form
+                        method="POST"
+                        action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}">
 
-                        <input type="hidden"
-                               name="csrf_token"
-                               value="{{ csrf_token() }}">
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="{{ csrf_token() }}"
+                        >
 
                         <button type="submit" class="favorite-button">
                             ★ Save Favorite
                         </button>
                     </form>
 
-                    <form method="POST"
-                          action="{{ url_for('delete_food_entry', entry_id=entry.id) }}">
+                    <form
+                        method="POST"
+                        action="{{ url_for('delete_food_entry', entry_id=entry.id) }}">
 
-                        <input type="hidden"
-                               name="csrf_token"
-                               value="{{ csrf_token() }}">
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="{{ csrf_token() }}"
+                        >
 
                         <button type="submit" class="delete-button">
                             Delete
@@ -208,13 +271,24 @@
                     </form>
 
                 </div>
+
             </div>
 
         {% else %}
 
-            <p class="muted">
-                No food logged today.
-            </p>
+            <div class="empty-food-state">
+                <div class="empty-food-icon">+</div>
+
+                <h3>No food logged today</h3>
+
+                <p>
+                    Start tracking your meals to see your daily progress.
+                </p>
+
+                <a class="action-link" href="{{ url_for('search_food') }}">
+                    Add Your First Meal
+                </a>
+            </div>
 
         {% endfor %}
 
