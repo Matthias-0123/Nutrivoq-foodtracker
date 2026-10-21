@@ -13,7 +13,8 @@
     <header class="dashboard-header">
         <div>
             <h1>Nutrivoq</h1>
-            <p>Daily Overview — {{ session.email }}</p>
+            <p>Daily Overview — {{ session.get('username', 'User') }}</p>
+            <p><a href="{{ url_for('auth.change_username') }}">Change Username</a></p>
         </div>
 
         <form action="{{ url_for('auth.logout') }}" method="POST">

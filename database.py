@@ -2,6 +2,7 @@
 import sqlite3
 from pathlib import Path
 
+
 DATABASE_PATH = Path(__file__).resolve().parent / "foodtracker.db"
 
 
@@ -18,8 +19,51 @@ def initialize_database():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                username TEXT
             )
+        """)
+
+        columns = {
+            column["name"]
+            for column in connection.execute(
+                "PRAGMA table_info(users)"
+            ).fetchall()
+        }
+
+        if "username" not in columns:
+            connection.execute(
+                "ALTER TABLE users ADD COLUMN username TEXT"
+            )
+
+        existing_users = connection.execute("""
+            SELECT id
+            FROM users
+            WHERE username IS NULL OR TRIM(username) = ''
+            ORDER BY id
+        """).fetchall()
+
+        for user in existing_users:
+            username = f"user{user['id']}"
+
+            while connection.execute(
+                """
+                SELECT 1 FROM users
+                WHERE username = ? COLLATE NOCASE
+                """,
+                (username,)
+            ).fetchone():
+                username += "_"
+
+            connection.execute(
+                "UPDATE users SET username = ? WHERE id = ?",
+                (username, user["id"])
+            )
+
+        connection.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS
+            idx_users_username
+            ON users(username COLLATE NOCASE)
         """)
 
         connection.execute("""
@@ -32,7 +76,6 @@ def initialize_database():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
-
 
         connection.execute("""
             CREATE TABLE IF NOT EXISTS food_entries (
@@ -75,4 +118,3 @@ def initialize_database():
                     ON DELETE CASCADE
             )
         """)
-

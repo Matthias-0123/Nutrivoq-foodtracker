@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Change Username - Nutrivoq</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="container">
+    <h1>Change Username</h1>
+    <p>Choose how your name appears on Nutrivoq.</p>
+
+    {% for message in get_flashed_messages() %}
+        <p class="message">{{ message }}</p>
+    {% endfor %}
+
+    <form method="POST">
+        <input type="hidden"
+               name="csrf_token"
+               value="{{ csrf_token() }}">
+
+        <label for="username">New Username</label>
+        <input
+            type="text"
+            id="username"
+            name="username"
+            value="{{ session.get('username', '') }}"
+            minlength="3"
+            maxlength="20"
+            pattern="[A-Za-z0-9_]{3,20}"
+            autocomplete="username"
+            required
+        >
+
+        <button type="submit">Save Username</button>
+    </form>
+
+    <p>
+        <a href="{{ url_for('dashboard') }}">
+            Back to Dashboard
+        </a>
+    </p>
+</main>
+</body>
+</html>
