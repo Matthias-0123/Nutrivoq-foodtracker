@@ -35,7 +35,9 @@ h1 {
     color: var(--primary-hover);
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
     line-height: 1.3;
 }
 
@@ -144,23 +146,42 @@ button:disabled {
     margin-top: 0;
 }
 
-.action-link {
+.action-link,
+.dashboard-actions .action-link {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 13px 18px;
+    min-height: 54px;
+    padding: 16px 20px;
     background: var(--primary);
     color: #052e16;
-    border-radius: 10px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
     font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
     text-decoration: none;
-    transition: background 0.2s, transform 0.2s;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        transform 0.2s,
+        box-shadow 0.2s;
 }
 
-.action-link:hover {
+.action-link:hover,
+.dashboard-actions .action-link:hover {
     background: var(--primary-hover);
     color: #052e16;
     text-decoration: none;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.15);
+}
+
+.action-link:focus-visible {
+    outline: 2px solid #86efac;
+    outline-offset: 3px;
 }
 
 .secondary-button,
@@ -440,15 +461,6 @@ button:disabled {
 
 .dashboard-actions .action-link {
     width: 100%;
-    min-height: 54px;
-    padding: 16px;
-    border-radius: 12px;
-    font-size: 15px;
-    text-align: center;
-}
-
-.dashboard-actions .action-link:hover {
-    transform: translateY(-2px);
 }
 
 /* Food entries */
@@ -551,10 +563,6 @@ button:disabled {
 .empty-food-state p {
     margin: 0 0 22px;
     color: #94a3b8;
-    font-size: 15px;
-}
-
-.empty-food-state .action-link {
     font-size: 15px;
 }
 
@@ -865,4 +873,9 @@ button:disabled {
     .calorie-summary {
         gap: 12px;
     }
+}
+
+.container > .action-link {
+    width: 100%;
+    margin-top: 16px;
 }
