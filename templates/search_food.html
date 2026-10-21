@@ -4,136 +4,310 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Food - Jumbo Food Tracker</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Search Food - Nutrivoq</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        .search-form {
+            display: flex;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .search-form input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .product-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 18px;
+            margin-bottom: 12px;
+            border: 1px solid #374151;
+            border-radius: 12px;
+        }
+
+        .product-card img {
+            width: 90px;
+            height: 90px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .product-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .product-details h3 {
+            margin: 0 0 8px;
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 28px 0;
+        }
+
+        .pagination[hidden] {
+            display: none;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 600px) {
+            .product-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .search-form {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
+
 <body>
 <main class="container">
-    <h1>Search Jumbo Products</h1>
-    <p>Search products and add them to your daily tracker.</p>
 
-    <label for="product-search">Product Name</label>
-    <input
-        type="search"
-        id="product-search"
-        placeholder="Search milk, bread, chicken..."
-        autocomplete="off"
-    >
+    <h1>Nutrivoq</h1>
+    <h2>Search Food</h2>
+
+    <p class="muted">
+        Search food products from all available brands.
+    </p>
+
+    <form id="search-form" class="search-form">
+        <input
+            type="search"
+            id="product-search"
+            placeholder="Search milk, rice, chicken..."
+            minlength="3"
+            maxlength="100"
+            required
+        >
+
+        <button type="submit" id="search-button">
+            Search
+        </button>
+    </form>
 
     <p id="search-status" class="muted">
-        Type at least 3 characters to search.
+        Enter a food name to start searching.
     </p>
 
     <div id="product-results"></div>
 
-    <p>
-        <a href="{{ url_for('dashboard') }}">
-            Back to Dashboard
-        </a>
-    </p>
+    <div id="pagination" class="pagination" hidden>
+        <button type="button" id="previous-page">
+            Previous
+        </button>
+
+        <span id="page-information"></span>
+
+        <button type="button" id="next-page">
+            Next
+        </button>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}">
+        Back to Dashboard
+    </a>
+
 </main>
 
 <script>
+    const searchForm = document.getElementById("search-form");
     const searchInput = document.getElementById("product-search");
+    const searchButton = document.getElementById("search-button");
+
     const resultsContainer = document.getElementById("product-results");
     const searchStatus = document.getElementById("search-status");
 
-    let searchTimeout;
-    let activeController;
+    const pagination = document.getElementById("pagination");
+    const previousButton = document.getElementById("previous-page");
+    const nextButton = document.getElementById("next-page");
+    const pageInformation = document.getElementById("page-information");
+
+    const productUrlTemplate = {{ url_for('select_food', barcode='BARCODE_PLACEHOLDER') | tojson }};
+
+    let currentPage = 1;
+    let totalPages = 0;
+    let activeQuery = "";
+    let activeController = null;
+
+    function createProductCard(product) {
+        const card = document.createElement("div");
+        card.className = "product-card";
+
+        if (product.image) {
+            const image = document.createElement("img");
+            image.src = product.image;
+            image.alt = product.name;
+            image.loading = "lazy";
+            card.appendChild(image);
+        }
+
+        const details = document.createElement("div");
+        details.className = "product-details";
+
+        const name = document.createElement("h3");
+        name.textContent = product.name;
+
+        const brand = document.createElement("p");
+        brand.className = "muted";
+        brand.textContent = product.brand || "Unknown brand";
+
+        const nutrition = document.createElement("p");
+        nutrition.textContent =
+            `${product.calories} kcal | ` +
+            `Protein: ${product.protein}g | ` +
+            `Carbs: ${product.carbs}g | ` +
+            `Fat: ${product.fat}g (per 100g)`;
+
+        const selectLink = document.createElement("a");
+
+        selectLink.href = productUrlTemplate.replace(
+            "BARCODE_PLACEHOLDER",
+            encodeURIComponent(product.barcode)
+        );
+
+        selectLink.className = "action-link";
+        selectLink.textContent = "Select Product";
+
+        details.append(
+            name,
+            brand,
+            nutrition,
+            selectLink
+        );
+
+        card.appendChild(details);
+
+        return card;
+    }
 
     function displayProducts(products) {
         resultsContainer.replaceChildren();
 
         if (products.length === 0) {
-            searchStatus.textContent = "No Jumbo products found.";
+            searchStatus.textContent =
+                "No products with complete nutrition data found on this page.";
             return;
         }
 
-        searchStatus.textContent = `${products.length} products found`;
+        searchStatus.textContent =
+            `${products.length} products on this page`;
 
         products.forEach(product => {
-            const card = document.createElement("div");
-            card.className = "product-card";
-
-            if (product.image) {
-                const image = document.createElement("img");
-                image.src = product.image;
-                image.alt = product.name;
-                image.loading = "lazy";
-                card.appendChild(image);
-            }
-
-            const details = document.createElement("div");
-            details.className = "product-details";
-
-            const name = document.createElement("h3");
-            name.textContent = product.name;
-
-            const nutrition = document.createElement("p");
-            nutrition.textContent =
-                `${product.calories} kcal | ` +
-                `P: ${product.protein}g | ` +
-                `C: ${product.carbs}g | ` +
-                `F: ${product.fat}g`;
-
-            const link = document.createElement("a");
-            link.href = `/food/select/${encodeURIComponent(product.barcode)}`;
-            link.textContent = "Select Product";
-            link.className = "action-link";
-
-            details.append(name, nutrition, link);
-            card.appendChild(details);
-
-            resultsContainer.appendChild(card);
+            resultsContainer.appendChild(
+                createProductCard(product)
+            );
         });
     }
 
-    searchInput.addEventListener("input", () => {
-        clearTimeout(searchTimeout);
+    function updatePagination() {
+        pagination.hidden = totalPages <= 1;
 
+        previousButton.disabled = currentPage <= 1;
+        nextButton.disabled = currentPage >= totalPages;
+
+        pageInformation.textContent =
+            `Page ${currentPage} of ${totalPages}`;
+    }
+
+    async function searchProducts(page = 1) {
         if (activeController) {
             activeController.abort();
         }
 
-        const query = searchInput.value.trim();
+        const controller = new AbortController();
+        activeController = controller;
 
-        resultsContainer.replaceChildren();
+        searchStatus.textContent = "Searching...";
+        searchButton.disabled = true;
+        previousButton.disabled = true;
+        nextButton.disabled = true;
+
+        try {
+            const parameters = new URLSearchParams({
+                query: activeQuery,
+                page: page
+            });
+
+            const response = await fetch(
+                `/api/products/search?${parameters}`,
+                {signal: controller.signal}
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error || "Unable to search products."
+                );
+            }
+
+            currentPage = data.page;
+            totalPages = data.total_pages;
+
+            displayProducts(data.products);
+            updatePagination();
+
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                searchStatus.textContent =
+                    "Food search is temporarily unavailable. Please try again.";
+
+                resultsContainer.replaceChildren();
+                pagination.hidden = true;
+
+                console.error(error);
+            }
+        } finally {
+            if (activeController === controller) {
+                searchButton.disabled = false;
+                previousButton.disabled = currentPage <= 1;
+                nextButton.disabled = currentPage >= totalPages;
+                activeController = null;
+            }
+        }
+    }
+
+    searchForm.addEventListener("submit", event => {
+        event.preventDefault();
+
+        const query = searchInput.value.trim();
 
         if (query.length < 3) {
             searchStatus.textContent =
-                "Type at least 3 characters to search.";
+                "Please enter at least 3 characters.";
             return;
         }
 
-        searchStatus.textContent = "Searching...";
+        activeQuery = query;
+        searchProducts(1);
+    });
 
-        searchTimeout = setTimeout(async () => {
-            const controller = new AbortController();
-            activeController = controller;
+    previousButton.addEventListener("click", () => {
+        if (currentPage > 1) {
+            searchProducts(currentPage - 1);
+        }
+    });
 
-            try {
-                const response = await fetch(
-                    `/api/products/search?query=${encodeURIComponent(query)}`,
-                    {signal: controller.signal}
-                );
-
-                if (!response.ok) {
-                    throw new Error("Search failed");
-                }
-
-                const products = await response.json();
-
-                if (!controller.signal.aborted) {
-                    displayProducts(products);
-                }
-
-            } catch (error) {
-                if (error.name !== "AbortError") {
-                    searchStatus.textContent =
-                        "Unable to search products right now.";
-                }
-            }
-        }, 500);
+    nextButton.addEventListener("click", () => {
+        if (currentPage < totalPages) {
+            searchProducts(currentPage + 1);
+        }
     });
 </script>
 </body>

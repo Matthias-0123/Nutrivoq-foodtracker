@@ -3,8 +3,8 @@ import math
 import os
 import re
 import requests
+import traceback
 
-from progress import progress
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 
@@ -37,6 +37,7 @@ from favorites import (
     delete_favorite
 )
 from product_api import search_products, get_product
+from progress import progress
 
 
 load_dotenv()
@@ -52,7 +53,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=is_production,
     PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-    MAX_CONTENT_LENGTH=1024 * 1024,
+    MAX_CONTENT_LENGTH=8 * 1024 * 1024,
     WTF_CSRF_TIME_LIMIT=3600
 )
 
@@ -139,6 +140,7 @@ def dashboard():
     )
 
 
+
 @app.route("/api/products/search")
 @limiter.limit("30 per minute")
 def search_products_api():
@@ -147,18 +149,35 @@ def search_products_api():
 
     query = request.args.get("query", "").strip()
 
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid page"}), 400
+
+    if page < 1 or page > 1000:
+        return jsonify({"error": "Invalid page"}), 400
+
     if len(query) < 3:
-        return jsonify([])
+        return jsonify({
+            "products": [],
+            "page": 1,
+            "total_pages": 0,
+            "total_results": 0
+        })
 
     if len(query) > 100:
         return jsonify({"error": "Search query too long"}), 400
 
     try:
-        products = search_products(query)
-        return jsonify(products)
+        results = search_products(query, page)
+        return jsonify(results)
 
-    except (requests.RequestException, ValueError, TypeError):
-        return jsonify({"error": "Product search unavailable"}), 502
+    except Exception:
+        app.logger.exception("Product search failed")
+        return jsonify({
+            "error": "Product search unavailable"
+        }), 502
+
 
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -302,29 +321,7 @@ def search_food():
     if "user_id" not in session:
         return redirect(url_for("auth.login"))
 
-    query = request.args.get("query", "").strip()
-    products = []
-    error = None
-
-    if query:
-        if len(query) > 100:
-            error = "Search query is too long."
-        else:
-            try:
-                products = search_products(query)
-            except (
-                requests.RequestException,
-                ValueError,
-                TypeError
-            ):
-                error = "Product search is temporarily unavailable."
-
-    return render_template(
-        "search_food.html",
-        products=products,
-        query=query,
-        error=error
-    )
+    return render_template("search_food.html")
 
 
 @app.route("/food/select/<barcode>", methods=["GET", "POST"])

@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - Food Tracker</title>
+    <title>Register - Nutrivoq</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <main class="container">
         <h1>Create Account</h1>
-        <p>Start tracking your nutrition.</p>
+        <p>Start tracking your nutrition with Nutrivoq.</p>
 
         {% for message in get_flashed_messages() %}
             <p class="message">{{ message }}</p>

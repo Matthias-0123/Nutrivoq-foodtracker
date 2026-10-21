@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Jumbo Food Tracker</title>
+    <title>Dashboard - Nutrivoq</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -12,8 +12,8 @@
 
     <header class="dashboard-header">
         <div>
-            <h1>Daily Overview</h1>
-            <p>{{ session.email }}</p>
+            <h1>Nutrivoq</h1>
+            <p>Daily Overview — {{ session.email }}</p>
         </div>
 
         <form action="{{ url_for('auth.logout') }}" method="POST">
@@ -50,9 +50,8 @@
             </div>
 
             <div class="progress-track">
-                <div
-                    class="progress-fill"
-                    style="width: {{ [[calorie_percentage, 0] | max, 100] | min }}%">
+                <div class="progress-fill"
+                     style="width: {{ [[calorie_percentage, 0] | max, 100] | min }}%">
                 </div>
             </div>
 
@@ -66,7 +65,6 @@
             <h2>Macronutrients</h2>
 
             <div class="macro-grid">
-
                 {% for macro in [
                     {
                         "name": "Protein",
@@ -96,13 +94,11 @@
                         [[percentage, 0] | max, 100] | min %}
 
                     <div class="macro-item">
-                        <div
-                            class="progress-circle"
-                            style="
+                        <div class="progress-circle"
+                             style="
                                 --progress: {{ circle_percentage }}%;
                                 --circle-color: {{ macro.color }};
-                            "
-                        >
+                             ">
                             <div class="circle-inner">
                                 <strong>
                                     {{ percentage | round | int }}%
@@ -111,14 +107,11 @@
                         </div>
 
                         <h3>{{ macro.name }}</h3>
-
                         <p class="muted">
                             {{ macro.used }} / {{ macro.goal }} g
                         </p>
                     </div>
-
                 {% endfor %}
-
             </div>
         </section>
 
@@ -141,7 +134,7 @@
 
         <a class="action-link"
            href="{{ url_for('search_food') }}">
-            Search Jumbo Products
+            Search All Foods
         </a>
 
         <a class="action-link secondary-link"
@@ -182,7 +175,6 @@
         {% for entry in entries %}
 
             <div class="food-entry">
-
                 <div class="food-entry-details">
                     <strong>{{ entry.food_name }}</strong>
 
@@ -200,30 +192,22 @@
 
                 <div class="food-entry-actions">
 
-                    <form
-                        method="POST"
-                        action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}"
-                    >
-                        <input
-                            type="hidden"
-                            name="csrf_token"
-                            value="{{ csrf_token() }}"
-                        >
+                    <form method="POST"
+                          action="{{ url_for('save_favorite_entry', entry_id=entry.id) }}">
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="{{ csrf_token() }}">
 
                         <button type="submit" class="favorite-button">
                             ★ Save Favorite
                         </button>
                     </form>
 
-                    <form
-                        method="POST"
-                        action="{{ url_for('delete_food_entry', entry_id=entry.id) }}"
-                    >
-                        <input
-                            type="hidden"
-                            name="csrf_token"
-                            value="{{ csrf_token() }}"
-                        >
+                    <form method="POST"
+                          action="{{ url_for('delete_food_entry', entry_id=entry.id) }}">
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="{{ csrf_token() }}">
 
                         <button type="submit" class="delete-button">
                             Delete
@@ -231,7 +215,6 @@
                     </form>
 
                 </div>
-
             </div>
 
         {% else %}

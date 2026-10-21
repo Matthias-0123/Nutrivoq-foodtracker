@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food History - Jumbo Food Tracker</title>
+    <title>Food History - Nutrivoq</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -16,13 +16,11 @@
     <form method="GET" action="{{ url_for('food_history') }}">
         <label for="date">Select Date</label>
 
-        <input
-            type="date"
-            id="date"
-            name="date"
-            value="{{ selected_date }}"
-            required
-        >
+        <input type="date"
+               id="date"
+               name="date"
+               value="{{ selected_date }}"
+               required>
 
         <button type="submit">View History</button>
     </form>
